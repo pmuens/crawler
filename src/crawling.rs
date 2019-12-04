@@ -8,6 +8,12 @@ use std::str::{from_utf8, FromStr};
 use std::time::SystemTime;
 use url::Url;
 
+lazy_static! {
+    static ref LINK_REGEX: Regex =
+        Regex::new(r#"\s*(?i)href\s*=\s*("([^"]*)"|'[^']*'|([^'">\s]+))"#)
+            .unwrap_or_else(|_| panic!("Error parsing Regex"));
+}
+
 #[derive(PartialEq, Debug)]
 pub enum Crawling {
     Html(HtmlCrawling),
@@ -67,11 +73,10 @@ impl HtmlCrawling {
     }
 
     pub fn get_all_links(&self) -> Option<Vec<String>> {
-        let regex = Regex::new(r#"\s*(?i)href\s*=\s*("([^"]*)"|'[^']*'|([^'">\s]+))"#).unwrap();
         let content = from_utf8(&self.content_raw[..])
             .unwrap_or_else(|_| panic!("Invalid HTML document content"));
         let mut links = vec![];
-        for cap in regex.captures_iter(content) {
+        for cap in LINK_REGEX.captures_iter(content) {
             let mut url = String::from(&cap[2]);
             if !url.starts_with("http") || !url.starts_with("https") {
                 url = self.url.join(&url).unwrap().to_string();
