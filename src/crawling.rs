@@ -4,7 +4,6 @@ extern crate url;
 use regex::Regex;
 use std::error::Error;
 use std::io::Write;
-use std::mem::discriminant;
 use std::str::{from_utf8, FromStr};
 use std::time::SystemTime;
 use url::Url;
@@ -16,63 +15,26 @@ lazy_static! {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Crawling {
-    Html(HtmlCrawling),
+pub enum Kind {
+    Html,
     Unknown,
 }
 
-impl Crawling {
-    pub fn determine_type(url: &str, content_raw: &[u8]) -> Result<Self, Box<dyn Error>> {
-        let parsing_attempt = String::from_utf8_lossy(content_raw);
-        if parsing_attempt.ends_with("html>") {
-            let crawling = HtmlCrawling::new(url, content_raw.to_vec())?;
-            return Ok(Crawling::Html(crawling));
-        }
-        Ok(Crawling::Unknown)
-    }
-}
-
-#[test]
-fn determine_type_html() {
-    let url = "http://example.com";
-    let mut content_raw = vec![];
-    content_raw.write_all(b"<html>Foo Bar</html>").unwrap();
-
-    // NOTE: using `discriminant` here because we don't care about the actual
-    // values in the `HtmlCrawling`
-    assert_eq!(
-        discriminant(&Crawling::determine_type(url, &content_raw).unwrap()),
-        discriminant(&Crawling::Html(
-            HtmlCrawling::new(url, content_raw).unwrap()
-        ))
-    );
-}
-
-#[test]
-fn determine_type_unknown() {
-    let url = "http://example.com";
-    let mut content_raw = vec![];
-    content_raw.write_all(&[1, 2, 3, 4, 5, 6]).unwrap();
-
-    assert_eq!(
-        Crawling::determine_type(url, &content_raw).unwrap(),
-        Crawling::Unknown
-    );
-}
-
-#[derive(PartialEq, Debug)]
-pub struct HtmlCrawling {
+pub struct Crawling {
     url: Url,
     content_raw: Vec<u8>,
+    kind: Kind,
     created_at: SystemTime,
 }
 
-impl HtmlCrawling {
+impl Crawling {
     pub fn new(url: &str, content_raw: Vec<u8>) -> Result<Self, Box<dyn Error>> {
         let parsed_url = Url::from_str(url)?;
-        let crawl = HtmlCrawling {
+        let kind = Self::determine_kind(&content_raw);
+        let crawl = Crawling {
             url: parsed_url,
             content_raw,
+            kind,
             created_at: SystemTime::now(),
         };
         Ok(crawl)
@@ -94,6 +56,14 @@ impl HtmlCrawling {
         }
         None
     }
+
+    pub fn determine_kind(content_raw: &[u8]) -> Kind {
+        let parsing_attempt = String::from_utf8_lossy(content_raw);
+        if parsing_attempt.ends_with("html>") {
+            return Kind::Html;
+        }
+        Kind::Unknown
+    }
 }
 
 #[test]
@@ -109,7 +79,7 @@ fn html_crawling_find_links() {
         )
         .unwrap();
 
-    let html_crawling = HtmlCrawling::new(&url, content_raw).unwrap();
+    let html_crawling = Crawling::new(&url, content_raw).unwrap();
 
     assert_eq!(
         html_crawling.get_all_links().unwrap(),
@@ -119,4 +89,26 @@ fn html_crawling_find_links() {
             "https://jdoe.com".to_string(),
         ]
     );
+}
+
+#[test]
+fn determine_kind_html() {
+    let url = "http://example.com";
+    let mut content_raw = vec![];
+    content_raw.write_all(b"<html>Foo Bar</html>").unwrap();
+
+    let crawling = Crawling::new(url, content_raw).unwrap();
+
+    assert_eq!(crawling.kind, Kind::Html);
+}
+
+#[test]
+fn determine_kind_unknown() {
+    let url = "http://example.com";
+    let mut content_raw = vec![];
+    content_raw.write_all(&[1, 2, 3, 4, 5, 6]).unwrap();
+
+    let crawling = Crawling::new(url, content_raw).unwrap();
+
+    assert_eq!(crawling.kind, Kind::Unknown);
 }
