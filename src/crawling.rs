@@ -23,7 +23,7 @@ pub enum Crawling {
 impl Crawling {
     pub fn determine_type(url: &str, content_raw: &[u8]) -> Self {
         let parsing_attempt = String::from_utf8_lossy(content_raw);
-        if parsing_attempt.starts_with("<html") {
+        if parsing_attempt.ends_with("html>") {
             return Crawling::Html(HtmlCrawling::new(url, content_raw.to_vec()));
         }
         Crawling::Unknown
