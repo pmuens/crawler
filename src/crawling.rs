@@ -3,14 +3,54 @@ extern crate url;
 
 use regex::Regex;
 use std::io::Write;
+use std::mem::discriminant;
 use std::str::{from_utf8, FromStr};
 use std::time::SystemTime;
 use url::Url;
 
+#[derive(PartialEq, Debug)]
 pub enum Crawling {
     Html(HtmlCrawling),
+    Unknown,
 }
 
+impl Crawling {
+    pub fn determine_type(url: &str, content_raw: &[u8]) -> Self {
+        let parsing_attempt = String::from_utf8_lossy(content_raw);
+        if parsing_attempt.starts_with("<html") {
+            return Crawling::Html(HtmlCrawling::new(url, content_raw.to_vec()));
+        }
+        Crawling::Unknown
+    }
+}
+
+#[test]
+fn determine_type_html() {
+    let url = "http://example.com";
+    let mut content_raw = vec![];
+    content_raw.write_all(b"<html>Foo Bar</html>").unwrap();
+
+    // NOTE: using `discriminant` here because we don't care about the actual
+    // values in the `HtmlCrawling`
+    assert_eq!(
+        discriminant(&Crawling::determine_type(url, &content_raw)),
+        discriminant(&Crawling::Html(HtmlCrawling::new(url, content_raw)))
+    );
+}
+
+#[test]
+fn determine_type_unknown() {
+    let url = "http://example.com";
+    let mut content_raw = vec![];
+    content_raw.write_all(&[1, 2, 3, 4, 5, 6]).unwrap();
+
+    assert_eq!(
+        Crawling::determine_type(url, &content_raw),
+        Crawling::Unknown
+    );
+}
+
+#[derive(PartialEq, Debug)]
 pub struct HtmlCrawling {
     url: Url,
     content_raw: Vec<u8>,
