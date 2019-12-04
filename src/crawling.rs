@@ -64,6 +64,10 @@ impl Crawling {
         }
         Kind::Unknown
     }
+
+    pub fn write<T: Write>(&self, sink: &mut T) {
+        sink.write_all(&self.content_raw);
+    }
 }
 
 #[test]
@@ -111,4 +115,18 @@ fn determine_kind_unknown() {
     let crawling = Crawling::new(url, content_raw).unwrap();
 
     assert_eq!(crawling.kind, Kind::Unknown);
+}
+
+#[test]
+fn crawling_write() {
+    let url = "http://example.com";
+    let mut content_raw = vec![];
+    content_raw.write_all(b"Hello World!").unwrap();
+
+    let mut sink: Vec<u8> = vec![];
+
+    let crawling = Crawling::new(&url, content_raw).unwrap();
+    crawling.write(&mut sink);
+
+    assert_eq!(sink, crawling.content_raw);
 }
