@@ -2,6 +2,7 @@ extern crate regex;
 extern crate url;
 
 use regex::Regex;
+use std::error::Error;
 use std::io::Write;
 use std::mem::discriminant;
 use std::str::{from_utf8, FromStr};
@@ -21,12 +22,13 @@ pub enum Crawling {
 }
 
 impl Crawling {
-    pub fn determine_type(url: &str, content_raw: &[u8]) -> Self {
+    pub fn determine_type(url: &str, content_raw: &[u8]) -> Result<Self, Box<dyn Error>> {
         let parsing_attempt = String::from_utf8_lossy(content_raw);
         if parsing_attempt.ends_with("html>") {
-            return Crawling::Html(HtmlCrawling::new(url, content_raw.to_vec()));
+            let crawling = HtmlCrawling::new(url, content_raw.to_vec())?;
+            return Ok(Crawling::Html(crawling));
         }
-        Crawling::Unknown
+        Ok(Crawling::Unknown)
     }
 }
 
@@ -39,8 +41,10 @@ fn determine_type_html() {
     // NOTE: using `discriminant` here because we don't care about the actual
     // values in the `HtmlCrawling`
     assert_eq!(
-        discriminant(&Crawling::determine_type(url, &content_raw)),
-        discriminant(&Crawling::Html(HtmlCrawling::new(url, content_raw)))
+        discriminant(&Crawling::determine_type(url, &content_raw).unwrap()),
+        discriminant(&Crawling::Html(
+            HtmlCrawling::new(url, content_raw).unwrap()
+        ))
     );
 }
 
@@ -51,7 +55,7 @@ fn determine_type_unknown() {
     content_raw.write_all(&[1, 2, 3, 4, 5, 6]).unwrap();
 
     assert_eq!(
-        Crawling::determine_type(url, &content_raw),
+        Crawling::determine_type(url, &content_raw).unwrap(),
         Crawling::Unknown
     );
 }
@@ -64,12 +68,14 @@ pub struct HtmlCrawling {
 }
 
 impl HtmlCrawling {
-    pub fn new(url: &str, content_raw: Vec<u8>) -> Self {
-        HtmlCrawling {
-            url: Url::from_str(url).unwrap_or_else(|_| panic!("Malformed URL: {}", url)),
+    pub fn new(url: &str, content_raw: Vec<u8>) -> Result<Self, Box<dyn Error>> {
+        let parsed_url = Url::from_str(url)?;
+        let crawl = HtmlCrawling {
+            url: parsed_url,
             content_raw,
             created_at: SystemTime::now(),
-        }
+        };
+        Ok(crawl)
     }
 
     pub fn get_all_links(&self) -> Option<Vec<String>> {
@@ -103,7 +109,7 @@ fn html_crawling_find_links() {
         )
         .unwrap();
 
-    let html_crawling = HtmlCrawling::new(&url, content_raw);
+    let html_crawling = HtmlCrawling::new(&url, content_raw).unwrap();
 
     assert_eq!(
         html_crawling.get_all_links().unwrap(),
