@@ -41,18 +41,19 @@ impl Crawling {
     }
 
     pub fn get_all_links(&self) -> Option<Vec<String>> {
-        let content = from_utf8(&self.content_raw[..])
-            .unwrap_or_else(|_| panic!("Invalid HTML document content"));
-        let mut links = vec![];
-        for cap in LINK_REGEX.captures_iter(content) {
-            let mut url = String::from(&cap[2]);
-            if !url.starts_with("http") || !url.starts_with("https") {
-                url = self.url.join(&url).unwrap().to_string();
+        if self.kind == Kind::Html {
+            let content = String::from_utf8_lossy(&self.content_raw);
+            let mut links = vec![];
+            for cap in LINK_REGEX.captures_iter(&content) {
+                let mut url = String::from(&cap[2]);
+                if !url.starts_with("http") || !url.starts_with("https") {
+                    url = self.url.join(&url).unwrap().to_string();
+                }
+                links.push(url);
             }
-            links.push(url);
-        }
-        if !links.is_empty() {
-            return Some(links);
+            if !links.is_empty() {
+                return Some(links);
+            }
         }
         None
     }
@@ -71,28 +72,42 @@ impl Crawling {
 }
 
 #[test]
-fn html_crawling_find_links() {
+fn html_crawling_get_all_links() {
     let url = "http://example.com";
     let mut content_raw = vec![];
     content_raw
         .write_all(
-            b"Read the\
-            <a href=\"news\">News</a>, go back to\
+            b"<html>\
+            Read the <a href=\"news\">News</a>, go back to\
             <a href=\"/home?foo=bar&baz=qux#foo\">Home</a> or visit\
-            <a href=\"https://jdoe.com\">Johns Website</a>.",
+            <a href=\"https://jdoe.com\">Johns Website</a>.\
+            </html>",
         )
         .unwrap();
 
-    let html_crawling = Crawling::new(&url, content_raw).unwrap();
+    let crawling = Crawling::new(&url, content_raw).unwrap();
 
     assert_eq!(
-        html_crawling.get_all_links().unwrap(),
-        [
+        crawling.get_all_links(),
+        Some(vec![
             "http://example.com/news".to_string(),
             "http://example.com/home?foo=bar&baz=qux#foo".to_string(),
             "https://jdoe.com".to_string(),
-        ]
+        ])
     );
+}
+
+#[test]
+fn unknown_crawling_get_all_links() {
+    let url = "http://example.com";
+    let mut content_raw = vec![];
+    content_raw
+        .write_all(b"This is not valid <a href=\"html\">HTML</a>!\"")
+        .unwrap();
+
+    let crawling = Crawling::new(&url, content_raw).unwrap();
+
+    assert_eq!(crawling.get_all_links(), None);
 }
 
 #[test]
