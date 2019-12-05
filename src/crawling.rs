@@ -42,11 +42,13 @@ impl Crawling {
             let content = String::from_utf8_lossy(&self.content_raw);
             let mut links = vec![];
             for cap in LINK_REGEX.captures_iter(&content) {
-                let mut url = String::from(&cap[2]);
-                if !url.starts_with("http") || !url.starts_with("https") {
-                    url = self.url.join(&url).unwrap().to_string();
+                if cap.get(2).is_some() {
+                    let mut url = String::from(&cap[2]);
+                    if !url.starts_with("http") || !url.starts_with("https") {
+                        url = self.url.join(&url).unwrap().to_string();
+                    }
+                    links.push(url);
                 }
-                links.push(url);
             }
             if !links.is_empty() {
                 return Some(links);
@@ -69,7 +71,7 @@ impl Crawling {
 }
 
 #[test]
-fn html_crawling_get_all_links() {
+fn html_crawling_get_all_links_links() {
     let url = Url::from_str("http://example.com").unwrap();
 
     let mut content_raw = vec![];
@@ -85,6 +87,7 @@ fn html_crawling_get_all_links() {
 
     let crawling = Crawling::new(url, content_raw);
 
+    assert_eq!(crawling.kind, Kind::Html);
     assert_eq!(
         crawling.get_all_links(),
         Some(vec![
@@ -93,6 +96,34 @@ fn html_crawling_get_all_links() {
             "https://jdoe.com".to_string(),
         ])
     );
+}
+
+#[test]
+fn html_crawling_get_all_links_no_links() {
+    let url = Url::from_str("http://example.com").unwrap();
+
+    let mut content_raw = vec![];
+    content_raw.write_all(b"<html>Hello World</html>").unwrap();
+
+    let crawling = Crawling::new(url, content_raw);
+
+    assert_eq!(crawling.kind, Kind::Html);
+    assert_eq!(crawling.get_all_links(), None);
+}
+
+#[test]
+fn html_crawling_get_all_links_single_quotes() {
+    let url = Url::from_str("http://example.com").unwrap();
+
+    let mut content_raw = vec![];
+    content_raw
+        .write_all(b"<html><a href='http://google.com'></a></html>")
+        .unwrap();
+
+    let crawling = Crawling::new(url, content_raw);
+
+    assert_eq!(crawling.kind, Kind::Html);
+    assert_eq!(crawling.get_all_links(), None);
 }
 
 #[test]
@@ -105,6 +136,7 @@ fn unknown_crawling_get_all_links() {
 
     let crawling = Crawling::new(url, content_raw);
 
+    assert_eq!(crawling.kind, Kind::Unknown);
     assert_eq!(crawling.get_all_links(), None);
 }
 
