@@ -1,7 +1,5 @@
-extern crate chrono;
-
-use self::chrono::Utc;
 use chrono::DateTime;
+use chrono::Utc;
 use std::time::SystemTime;
 
 pub enum Log {

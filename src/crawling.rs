@@ -1,6 +1,3 @@
-extern crate regex;
-extern crate url;
-
 use regex::Regex;
 use std::io::Write;
 use std::str::FromStr;

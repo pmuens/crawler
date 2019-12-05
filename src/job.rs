@@ -1,5 +1,3 @@
-extern crate url;
-
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::str::FromStr;

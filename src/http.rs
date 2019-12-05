@@ -1,6 +1,3 @@
-extern crate reqwest;
-extern crate url;
-
 use reqwest::Client;
 use std::error::Error;
 use url::Url;
