@@ -3,7 +3,6 @@ extern crate url;
 
 use reqwest::Client;
 use std::error::Error;
-use std::str::FromStr;
 use std::time::SystemTime;
 use url::Url;
 
@@ -17,13 +16,11 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new(url: &str) -> Result<Self, Box<dyn Error>> {
-        let parsed_url = Url::from_str(url)?;
-        let req = Request {
-            url: parsed_url,
+    pub fn new(url: Url) -> Self {
+        Request {
+            url,
             created_at: SystemTime::now(),
-        };
-        Ok(req)
+        }
     }
 
     pub fn get(&self) -> Result<Vec<u8>, Box<dyn Error>> {

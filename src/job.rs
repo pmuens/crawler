@@ -2,7 +2,6 @@ extern crate url;
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
-use std::error::Error;
 use std::str::FromStr;
 use std::time::SystemTime;
 use url::Url;
@@ -30,14 +29,12 @@ pub struct Job {
 }
 
 impl Job {
-    pub fn new(url: &str, priority: Priority) -> Result<Self, Box<dyn Error>> {
-        let parsed_url = Url::from_str(url)?;
-        let job = Job {
-            url: parsed_url,
+    pub fn new(url: Url, priority: Priority) -> Self {
+        Job {
+            url,
             priority,
             created_at: SystemTime::now(),
-        };
-        Ok(job)
+        }
     }
 }
 
@@ -71,11 +68,13 @@ impl PartialEq for Job {
 
 #[test]
 fn job_queue() {
-    let job1 = Job::new("https://example.com/p1/1", Priority::P1).unwrap();
-    let job2 = Job::new("https://example.com/p1/2", Priority::P1).unwrap();
-    let job3 = Job::new("https://example.com/p2/1", Priority::P2).unwrap();
-    let job4 = Job::new("https://example.com/p2/2", Priority::P2).unwrap();
-    let job5 = Job::new("https://example.com/p3/1", Priority::P3).unwrap();
+    let to_url = |url: &str| Url::from_str(url).unwrap();
+
+    let job1 = Job::new(to_url("https://example.com/p1/1"), Priority::P1);
+    let job2 = Job::new(to_url("https://example.com/p1/2"), Priority::P1);
+    let job3 = Job::new(to_url("https://example.com/p2/1"), Priority::P2);
+    let job4 = Job::new(to_url("https://example.com/p2/2"), Priority::P2);
+    let job5 = Job::new(to_url("https://example.com/p3/1"), Priority::P3);
 
     let jobs = vec![&job2, &job5, &job3, &job4, &job1];
 

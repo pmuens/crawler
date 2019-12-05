@@ -2,9 +2,8 @@ extern crate regex;
 extern crate url;
 
 use regex::Regex;
-use std::error::Error;
 use std::io::Write;
-use std::str::{from_utf8, FromStr};
+use std::str::FromStr;
 use std::time::SystemTime;
 use url::Url;
 
@@ -28,16 +27,14 @@ pub struct Crawling {
 }
 
 impl Crawling {
-    pub fn new(url: &str, content_raw: Vec<u8>) -> Result<Self, Box<dyn Error>> {
-        let parsed_url = Url::from_str(url)?;
+    pub fn new(url: Url, content_raw: Vec<u8>) -> Self {
         let kind = Self::determine_kind(&content_raw);
-        let crawl = Crawling {
-            url: parsed_url,
+        Crawling {
+            url,
             content_raw,
             kind,
             created_at: SystemTime::now(),
-        };
-        Ok(crawl)
+        }
     }
 
     pub fn get_all_links(&self) -> Option<Vec<String>> {
@@ -73,7 +70,8 @@ impl Crawling {
 
 #[test]
 fn html_crawling_get_all_links() {
-    let url = "http://example.com";
+    let url = Url::from_str("http://example.com").unwrap();
+
     let mut content_raw = vec![];
     content_raw
         .write_all(
@@ -85,7 +83,7 @@ fn html_crawling_get_all_links() {
         )
         .unwrap();
 
-    let crawling = Crawling::new(&url, content_raw).unwrap();
+    let crawling = Crawling::new(url, content_raw);
 
     assert_eq!(
         crawling.get_all_links(),
@@ -99,48 +97,48 @@ fn html_crawling_get_all_links() {
 
 #[test]
 fn unknown_crawling_get_all_links() {
-    let url = "http://example.com";
+    let url = Url::from_str("http://example.com").unwrap();
     let mut content_raw = vec![];
     content_raw
         .write_all(b"This is not valid <a href=\"html\">HTML</a>!\"")
         .unwrap();
 
-    let crawling = Crawling::new(&url, content_raw).unwrap();
+    let crawling = Crawling::new(url, content_raw);
 
     assert_eq!(crawling.get_all_links(), None);
 }
 
 #[test]
 fn determine_kind_html() {
-    let url = "http://example.com";
+    let url = Url::from_str("http://example.com").unwrap();
     let mut content_raw = vec![];
     content_raw.write_all(b"<html>Foo Bar</html>").unwrap();
 
-    let crawling = Crawling::new(url, content_raw).unwrap();
+    let crawling = Crawling::new(url, content_raw);
 
     assert_eq!(crawling.kind, Kind::Html);
 }
 
 #[test]
 fn determine_kind_unknown() {
-    let url = "http://example.com";
+    let url = Url::from_str("http://example.com").unwrap();
     let mut content_raw = vec![];
     content_raw.write_all(&[1, 2, 3, 4, 5, 6]).unwrap();
 
-    let crawling = Crawling::new(url, content_raw).unwrap();
+    let crawling = Crawling::new(url, content_raw);
 
     assert_eq!(crawling.kind, Kind::Unknown);
 }
 
 #[test]
 fn crawling_write() {
-    let url = "http://example.com";
+    let url = Url::from_str("http://example.com").unwrap();
     let mut content_raw = vec![];
     content_raw.write_all(b"Hello World!").unwrap();
 
     let mut sink: Vec<u8> = vec![];
 
-    let crawling = Crawling::new(&url, content_raw).unwrap();
+    let crawling = Crawling::new(url, content_raw);
     crawling.write(&mut sink);
 
     assert_eq!(sink, crawling.content_raw);
