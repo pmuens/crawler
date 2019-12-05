@@ -4,7 +4,6 @@ extern crate url;
 use regex::Regex;
 use std::io::Write;
 use std::str::FromStr;
-use std::time::SystemTime;
 use url::Url;
 
 lazy_static! {
@@ -20,10 +19,9 @@ pub enum Kind {
 }
 
 pub struct Crawling {
-    url: Url,
-    content_raw: Vec<u8>,
-    kind: Kind,
-    created_at: SystemTime,
+    pub url: Url,
+    pub content_raw: Vec<u8>,
+    pub kind: Kind,
 }
 
 impl Crawling {
@@ -33,7 +31,6 @@ impl Crawling {
             url,
             content_raw,
             kind,
-            created_at: SystemTime::now(),
         }
     }
 

@@ -3,7 +3,6 @@ extern crate url;
 
 use reqwest::Client;
 use std::error::Error;
-use std::time::SystemTime;
 use url::Url;
 
 lazy_static! {
@@ -11,16 +10,12 @@ lazy_static! {
 }
 
 pub struct Request {
-    url: Url,
-    created_at: SystemTime,
+    pub url: Url,
 }
 
 impl Request {
     pub fn new(url: Url) -> Self {
-        Request {
-            url,
-            created_at: SystemTime::now(),
-        }
+        Request { url }
     }
 
     pub fn get(&self) -> Result<Vec<u8>, Box<dyn Error>> {

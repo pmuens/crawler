@@ -3,7 +3,6 @@ extern crate url;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::str::FromStr;
-use std::time::SystemTime;
 use url::Url;
 
 /// Priority (P1 = Highest)
@@ -23,18 +22,13 @@ pub type JobQueue<Job> = BinaryHeap<Job>;
 /// A crawling job
 #[derive(Debug)]
 pub struct Job {
-    priority: Priority,
-    url: Url,
-    created_at: SystemTime,
+    pub priority: Priority,
+    pub url: Url,
 }
 
 impl Job {
     pub fn new(url: Url, priority: Priority) -> Self {
-        Job {
-            url,
-            priority,
-            created_at: SystemTime::now(),
-        }
+        Job { url, priority }
     }
 }
 
