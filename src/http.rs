@@ -7,7 +7,7 @@ lazy_static! {
 }
 
 pub struct Request {
-    pub url: Url,
+    url: Url,
 }
 
 impl Request {

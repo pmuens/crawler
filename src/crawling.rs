@@ -16,9 +16,9 @@ pub enum Kind {
 }
 
 pub struct Crawling {
-    pub url: Url,
-    pub content_raw: Vec<u8>,
-    pub kind: Kind,
+    url: Url,
+    content_raw: Vec<u8>,
+    kind: Kind,
 }
 
 impl Crawling {
