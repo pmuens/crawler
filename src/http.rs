@@ -1,6 +1,5 @@
-use reqwest::Client;
+use reqwest::{Client, Url};
 use std::error::Error;
-use url::Url;
 
 lazy_static! {
     static ref CLIENT: Client = Client::new();

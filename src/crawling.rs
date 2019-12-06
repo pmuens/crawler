@@ -1,7 +1,7 @@
 use regex::Regex;
+use reqwest::Url;
 use std::io::Write;
 use std::str::FromStr;
-use url::Url;
 
 lazy_static! {
     static ref LINK_REGEX: Regex =

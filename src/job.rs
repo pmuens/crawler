@@ -1,6 +1,6 @@
+use reqwest::Url;
 use std::collections::HashSet;
 use std::str::FromStr;
-use url::Url;
 
 // TODO: this set needs to be cleaned-up on a recurring basis to reclaim memory during runtime
 pub type ProcessedJobs = HashSet<Job>;
@@ -34,7 +34,7 @@ impl Queue<Job> for JobQueue {
 
 #[test]
 fn job_queue_enqueue() {
-    let to_url = |url: &str| Url::from_str(url).unwrap();
+    let to_url = |url: &str| Url::parse(url).unwrap();
     let mut queue = JobQueue::new();
 
     let job_1 = Job::new(to_url("http://example-1.com"));
@@ -54,7 +54,7 @@ fn job_queue_enqueue() {
 
 #[test]
 fn job_queue_dequeue() {
-    let to_url = |url: &str| Url::from_str(url).unwrap();
+    let to_url = |url: &str| Url::parse(url).unwrap();
     let mut queue = JobQueue::new();
 
     let job_1 = Job::new(to_url("http://example.com"));
