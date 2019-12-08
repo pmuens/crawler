@@ -55,8 +55,14 @@ impl Crawling {
     }
 
     pub fn determine_kind(content_raw: &[u8]) -> Kind {
-        let parsing_attempt = String::from_utf8_lossy(content_raw);
-        if parsing_attempt.ends_with("html>") {
+        let parsing = String::from_utf8_lossy(content_raw);
+        if parsing.ends_with("html>")
+            || parsing.ends_with("HTML>")
+            || parsing.starts_with("<html")
+            || parsing.starts_with("<HTML")
+            || parsing.starts_with("<!doctype html")
+            || parsing.starts_with("<!DOCTYPE html")
+        {
             return Kind::Html;
         }
         Kind::Unknown
@@ -147,12 +153,19 @@ fn unknown_crawling_find_urls_invalid_urls() {
 #[test]
 fn determine_kind_html() {
     let url = Url::from_str("http://example.com").unwrap();
-    let mut content_raw = vec![];
-    content_raw.write_all(b"<html>Foo Bar</html>").unwrap();
 
-    let crawling = Crawling::new(url, content_raw);
-
-    assert_eq!(crawling.kind, Kind::Html);
+    let crawling_1 = Crawling::new(url.clone(), b"<!doctype html>Foo Bar".to_vec());
+    assert_eq!(crawling_1.kind, Kind::Html);
+    let crawling_2 = Crawling::new(url.clone(), b"<!DOCTYPE html>Foo Bar".to_vec());
+    assert_eq!(crawling_2.kind, Kind::Html);
+    let crawling_3 = Crawling::new(url.clone(), b"<html>Foo Bar".to_vec());
+    assert_eq!(crawling_3.kind, Kind::Html);
+    let crawling_4 = Crawling::new(url.clone(), b"<HTML>Foo Bar".to_vec());
+    assert_eq!(crawling_4.kind, Kind::Html);
+    let crawling_5 = Crawling::new(url.clone(), b"Foo Bar</html>".to_vec());
+    assert_eq!(crawling_5.kind, Kind::Html);
+    let crawling_6 = Crawling::new(url.clone(), b"Foo Bar</HTML>".to_vec());
+    assert_eq!(crawling_6.kind, Kind::Html);
 }
 
 #[test]
