@@ -31,17 +31,20 @@ impl Crawling {
         }
     }
 
-    pub fn get_all_links(&self) -> Option<Vec<String>> {
+    pub fn find_urls(&self) -> Option<Vec<Url>> {
         if self.kind == Kind::Html {
             let content = String::from_utf8_lossy(&self.content_raw);
-            let mut links = vec![];
+            let mut links: Vec<Url> = vec![];
             for cap in LINK_REGEX.captures_iter(&content) {
                 if cap.get(2).is_some() {
                     let mut url = String::from(&cap[2]);
                     if !url.starts_with("http") || !url.starts_with("https") {
                         url = self.url.join(&url).unwrap().to_string();
                     }
-                    links.push(url);
+                    let parsing = Url::from_str(&url);
+                    if parsing.is_ok() {
+                        links.push(parsing.unwrap());
+                    }
                 }
             }
             if !links.is_empty() {
@@ -65,8 +68,9 @@ impl Crawling {
 }
 
 #[test]
-fn html_crawling_get_all_links_links() {
-    let url = Url::from_str("http://example.com").unwrap();
+fn html_crawling_find_urls_some_urls() {
+    let get_url = |url: &str| Url::from_str(url).unwrap();
+    let url = get_url("http://example.com");
 
     let mut content_raw = vec![];
     content_raw
@@ -75,6 +79,7 @@ fn html_crawling_get_all_links_links() {
             Read the <a href=\"news\">News</a>, go back to\
             <a href=\"/home?foo=bar&baz=qux#foo\">Home</a> or visit\
             <a href=\"https://jdoe.com\">Johns Website</a>.\
+            <a href=\"mailto:jdoe@example.com\">Contanct Me</a>\
             </html>",
         )
         .unwrap();
@@ -83,18 +88,20 @@ fn html_crawling_get_all_links_links() {
 
     assert_eq!(crawling.kind, Kind::Html);
     assert_eq!(
-        crawling.get_all_links(),
+        crawling.find_urls(),
         Some(vec![
-            "http://example.com/news".to_string(),
-            "http://example.com/home?foo=bar&baz=qux#foo".to_string(),
-            "https://jdoe.com".to_string(),
+            get_url("http://example.com/news"),
+            get_url("http://example.com/home?foo=bar&baz=qux#foo"),
+            get_url("https://jdoe.com"),
+            get_url("mailto:jdoe@example.com")
         ])
     );
 }
 
 #[test]
-fn html_crawling_get_all_links_no_links() {
-    let url = Url::from_str("http://example.com").unwrap();
+fn html_crawling_find_urls_no_urls() {
+    let get_url = |url: &str| Url::from_str(url).unwrap();
+    let url = get_url("http://example.com");
 
     let mut content_raw = vec![];
     content_raw.write_all(b"<html>Hello World</html>").unwrap();
@@ -102,12 +109,13 @@ fn html_crawling_get_all_links_no_links() {
     let crawling = Crawling::new(url, content_raw);
 
     assert_eq!(crawling.kind, Kind::Html);
-    assert_eq!(crawling.get_all_links(), None);
+    assert_eq!(crawling.find_urls(), None);
 }
 
 #[test]
-fn html_crawling_get_all_links_single_quotes() {
-    let url = Url::from_str("http://example.com").unwrap();
+fn html_crawling_find_urls_single_quotes() {
+    let get_url = |url: &str| Url::from_str(url).unwrap();
+    let url = get_url("http://example.com");
 
     let mut content_raw = vec![];
     content_raw
@@ -117,12 +125,14 @@ fn html_crawling_get_all_links_single_quotes() {
     let crawling = Crawling::new(url, content_raw);
 
     assert_eq!(crawling.kind, Kind::Html);
-    assert_eq!(crawling.get_all_links(), None);
+    assert_eq!(crawling.find_urls(), None);
 }
 
 #[test]
-fn unknown_crawling_get_all_links() {
-    let url = Url::from_str("http://example.com").unwrap();
+fn unknown_crawling_find_urls_invalid_urls() {
+    let get_url = |url: &str| Url::from_str(url).unwrap();
+    let url = get_url("http://example.com");
+
     let mut content_raw = vec![];
     content_raw
         .write_all(b"This is not valid <a href=\"html\">HTML</a>!\"")
@@ -131,7 +141,7 @@ fn unknown_crawling_get_all_links() {
     let crawling = Crawling::new(url, content_raw);
 
     assert_eq!(crawling.kind, Kind::Unknown);
-    assert_eq!(crawling.get_all_links(), None);
+    assert_eq!(crawling.find_urls(), None);
 }
 
 #[test]
