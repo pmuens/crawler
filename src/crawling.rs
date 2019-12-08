@@ -78,19 +78,16 @@ fn html_crawling_find_urls_some_urls() {
     let get_url = |url: &str| Url::from_str(url).unwrap();
     let url = get_url("http://example.com");
 
-    let mut content_raw = vec![];
-    content_raw
-        .write_all(
-            b"<html>\
+    let crawling = Crawling::new(
+        url,
+        b"<html>\
             Read the <a href=\"news\">News</a>, go back to\
             <a href=\"/home?foo=bar&baz=qux#foo\">Home</a> or visit\
             <a href=\"https://jdoe.com\">Johns Website</a>.\
             <a href=\"mailto:jdoe@example.com\">Contanct Me</a>\
-            </html>",
-        )
-        .unwrap();
-
-    let crawling = Crawling::new(url, content_raw);
+            </html>"
+            .to_vec(),
+    );
 
     assert_eq!(crawling.kind, Kind::Html);
     assert_eq!(
@@ -109,10 +106,7 @@ fn html_crawling_find_urls_no_urls() {
     let get_url = |url: &str| Url::from_str(url).unwrap();
     let url = get_url("http://example.com");
 
-    let mut content_raw = vec![];
-    content_raw.write_all(b"<html>Hello World</html>").unwrap();
-
-    let crawling = Crawling::new(url, content_raw);
+    let crawling = Crawling::new(url, b"<html>Hello World</html>".to_vec());
 
     assert_eq!(crawling.kind, Kind::Html);
     assert_eq!(crawling.find_urls(), None);
@@ -123,12 +117,10 @@ fn html_crawling_find_urls_single_quotes() {
     let get_url = |url: &str| Url::from_str(url).unwrap();
     let url = get_url("http://example.com");
 
-    let mut content_raw = vec![];
-    content_raw
-        .write_all(b"<html><a href='http://google.com'></a></html>")
-        .unwrap();
-
-    let crawling = Crawling::new(url, content_raw);
+    let crawling = Crawling::new(
+        url,
+        b"<html><a href='http://google.com'></a></html>".to_vec(),
+    );
 
     assert_eq!(crawling.kind, Kind::Html);
     assert_eq!(crawling.find_urls(), None);
@@ -139,12 +131,10 @@ fn unknown_crawling_find_urls_invalid_urls() {
     let get_url = |url: &str| Url::from_str(url).unwrap();
     let url = get_url("http://example.com");
 
-    let mut content_raw = vec![];
-    content_raw
-        .write_all(b"This is not valid <a href=\"html\">HTML</a>!\"")
-        .unwrap();
-
-    let crawling = Crawling::new(url, content_raw);
+    let crawling = Crawling::new(
+        url,
+        b"This is not valid <a href=\"html\">HTML</a>!\"".to_vec(),
+    );
 
     assert_eq!(crawling.kind, Kind::Unknown);
     assert_eq!(crawling.find_urls(), None);
@@ -171,10 +161,8 @@ fn determine_kind_html() {
 #[test]
 fn determine_kind_unknown() {
     let url = Url::from_str("http://example.com").unwrap();
-    let mut content_raw = vec![];
-    content_raw.write_all(&[1, 2, 3, 4, 5, 6]).unwrap();
 
-    let crawling = Crawling::new(url, content_raw);
+    let crawling = Crawling::new(url, (&[1, 2, 3, 4, 5, 6]).to_vec());
 
     assert_eq!(crawling.kind, Kind::Unknown);
 }
@@ -182,12 +170,10 @@ fn determine_kind_unknown() {
 #[test]
 fn crawling_write() {
     let url = Url::from_str("http://example.com").unwrap();
-    let mut content_raw = vec![];
-    content_raw.write_all(b"Hello World!").unwrap();
 
     let mut sink: Vec<u8> = vec![];
 
-    let crawling = Crawling::new(url, content_raw);
+    let crawling = Crawling::new(url, b"Hello World!".to_vec());
     crawling.write(&mut sink);
 
     assert_eq!(sink, crawling.content_raw);
