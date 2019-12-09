@@ -39,8 +39,8 @@ impl Crawling {
                         url = self.url.join(&url).unwrap().to_string();
                     }
                     let parsing = Url::from_str(&url);
-                    if parsing.is_ok() {
-                        links.push(parsing.unwrap());
+                    if let Ok(parsing) = parsing {
+                        links.push(parsing);
                     }
                 }
             }
