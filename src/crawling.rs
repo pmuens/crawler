@@ -1,5 +1,6 @@
 use regex::Regex;
 use reqwest::Url;
+use std::error::Error;
 use std::io::Write;
 use std::str::FromStr;
 
@@ -68,8 +69,12 @@ impl Crawling {
         Kind::Unknown
     }
 
-    pub fn write<T: Write>(&self, sink: &mut T) {
-        sink.write_all(&self.content_raw);
+    pub fn write<T: Write>(&self, dest: &mut T) -> Result<(), Box<dyn Error>> {
+        if dest.write_all(&self.content_raw[..]).is_ok() {
+            return Ok(());
+        }
+        let msg = format!("Error writing content of Crawling \"{}\"", self.url);
+        Err(msg.into())
     }
 }
 
@@ -170,11 +175,11 @@ fn determine_kind_unknown() {
 #[test]
 fn crawling_write() {
     let url = Url::from_str("http://example.com").unwrap();
-
-    let mut sink: Vec<u8> = vec![];
+    let mut dest: Vec<u8> = vec![];
 
     let crawling = Crawling::new(url, b"Hello World!".to_vec());
-    crawling.write(&mut sink);
+    let result = crawling.write(&mut dest);
 
-    assert_eq!(sink, crawling.content_raw);
+    assert!(result.is_ok());
+    assert_eq!(dest, crawling.content_raw);
 }
