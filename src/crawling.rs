@@ -18,23 +18,19 @@ pub enum Kind {
 
 pub struct Crawling {
     url: Url,
-    content_raw: Vec<u8>,
+    content: Vec<u8>,
     kind: Kind,
 }
 
 impl Crawling {
-    pub fn new(url: Url, content_raw: Vec<u8>) -> Self {
-        let kind = Self::determine_kind(&content_raw);
-        Crawling {
-            url,
-            content_raw,
-            kind,
-        }
+    pub fn new(url: Url, content: Vec<u8>) -> Self {
+        let kind = Self::determine_kind(&content);
+        Crawling { url, content, kind }
     }
 
     pub fn find_urls(&self) -> Option<Vec<Url>> {
         if self.kind == Kind::Html {
-            let content = String::from_utf8_lossy(&self.content_raw);
+            let content = String::from_utf8_lossy(&self.content);
             let mut links: Vec<Url> = vec![];
             for cap in LINK_REGEX.captures_iter(&content) {
                 if cap.get(2).is_some() {
@@ -55,8 +51,8 @@ impl Crawling {
         None
     }
 
-    pub fn determine_kind(content_raw: &[u8]) -> Kind {
-        let parsing = String::from_utf8_lossy(content_raw);
+    pub fn determine_kind(content: &[u8]) -> Kind {
+        let parsing = String::from_utf8_lossy(content);
         if parsing.ends_with("html>")
             || parsing.ends_with("HTML>")
             || parsing.starts_with("<html")
@@ -70,7 +66,7 @@ impl Crawling {
     }
 
     pub fn write<T: Write>(&self, dest: &mut T) -> Result<(), Box<dyn Error>> {
-        if dest.write_all(&self.content_raw[..]).is_ok() {
+        if dest.write_all(&self.content[..]).is_ok() {
             return Ok(());
         }
         let msg = format!("Error writing content of Crawling \"{}\"", self.url);
@@ -181,5 +177,5 @@ fn crawling_write() {
     let result = crawling.write(&mut dest);
 
     assert!(result.is_ok());
-    assert_eq!(dest, crawling.content_raw);
+    assert_eq!(dest, crawling.content);
 }
