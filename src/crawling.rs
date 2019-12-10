@@ -73,6 +73,10 @@ impl Crawling {
         let msg = format!("Error writing content of Crawling \"{}\"", self.url);
         Err(msg.into())
     }
+
+    pub fn get_domain(&self) -> Option<&str> {
+        self.url.domain()
+    }
 }
 
 #[test]
@@ -179,4 +183,12 @@ fn crawling_write() {
 
     assert!(result.is_ok());
     assert_eq!(dest, crawling.content);
+}
+
+#[test]
+fn crawling_get_domain() {
+    let url = Url::from_str("http://example.com/foo?bar&baz=qux#some").unwrap();
+    let crawling = Crawling::new(url, b"Hello World!".to_vec());
+
+    assert_eq!(crawling.get_domain(), Some("example.com"));
 }
