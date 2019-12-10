@@ -1,5 +1,11 @@
+use reqwest::Client;
 use reqwest::Url;
 use std::collections::{HashSet, VecDeque};
+use std::error::Error;
+
+lazy_static! {
+    static ref CLIENT: Client = Client::new();
+}
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub struct Job {
@@ -13,6 +19,18 @@ impl Job {
 
     pub fn get_url(&self) -> Url {
         self.url.to_owned()
+    }
+
+    pub fn fetch(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut resp = CLIENT.get(&self.url.to_string()).send()?;
+        if !resp.status().is_success() {
+            Err(resp.status().to_string())?;
+        }
+
+        let mut buffer: Vec<u8> = vec![];
+        resp.copy_to(&mut buffer)?;
+
+        Ok(buffer)
     }
 }
 
