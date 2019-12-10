@@ -1,19 +1,20 @@
 extern crate crawler;
 
+use crawler::args::Args;
 use crawler::run_single_threaded;
 use std::env::args;
+use std::error::Error;
 
 fn main() {
-    if args().len() != 3 {
-        println!("Usage: single URL OUT_DIR");
-        std::process::exit(1)
-    }
-
-    let url = args().nth(1).unwrap();
-    let dest = args().nth(2).unwrap();
-
-    run_single_threaded(&url, &dest).unwrap_or_else(|err| {
+    run().unwrap_or_else(|err| {
         eprintln!("{}", err);
         std::process::exit(1);
     });
+}
+
+fn run() -> Result<(), Box<dyn Error>> {
+    let arguments: Vec<String> = args().collect();
+    let args = Args::new(&arguments)?;
+    run_single_threaded(args.url, args.out_dir)?;
+    Ok(())
 }

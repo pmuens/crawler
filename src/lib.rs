@@ -9,6 +9,7 @@ mod job;
 mod utils;
 #[macro_use]
 mod logging;
+pub mod args;
 
 use crawling::Crawling;
 use job::{Job, JobQueue};
