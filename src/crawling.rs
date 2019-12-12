@@ -67,11 +67,8 @@ impl Crawling {
     }
 
     pub fn write<T: Write>(&self, dest: &mut T) -> Result<(), Box<dyn Error>> {
-        if dest.write_all(&self.content[..]).is_ok() {
-            return Ok(());
-        }
-        let msg = format!("Error writing content of Crawling \"{}\"", self.url);
-        Err(msg.into())
+        dest.write_all(&self.content[..])?;
+        Ok(())
     }
 
     pub fn get_domain(&self) -> Option<&str> {

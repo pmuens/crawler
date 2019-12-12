@@ -28,42 +28,32 @@ pub fn run_single_threaded(url: &str, out_dir: &str) -> Result<(), Box<dyn Error
     queue.enqueue(Job::new(url).unwrap());
 
     while let Some(job) = queue.dequeue() {
-        let crawling = crawl(&job);
-        if let Some(crawling) = crawling {
-            let urls = crawling.find_urls();
-            if let Some(urls) = urls {
-                urls.into_iter()
-                    .filter_map(Job::new)
-                    .for_each(|job| queue.enqueue(job));
-            }
-            write_to_disk(&dest, &crawling)?;
+        let crawling = crawl(&job)?;
+        let urls = crawling.find_urls();
+        if let Some(urls) = urls {
+            urls.into_iter()
+                .filter_map(Job::new)
+                .for_each(|job| queue.enqueue(job));
         }
+        write_to_disk(dest.clone(), &crawling);
     }
 
     Ok(())
 }
 
-fn crawl(job: &Job) -> Option<Crawling> {
+fn crawl(job: &Job) -> Result<Crawling, Box<dyn Error>> {
     log!(format!("GET {}", job.get_url()));
-    let result = job.fetch();
-
-    match result {
-        Ok(content) => Some(Crawling::new(job.get_url(), content)),
-        Err(err) => {
-            loge!(format!("Failed to GET \"{}\": {}", job.get_url(), err));
-            None
-        }
-    }
+    let content = job.fetch()?;
+    Ok(Crawling::new(job.get_url(), content))
 }
 
-fn write_to_disk(dest: &PathBuf, crawling: &Crawling) -> Result<(), Box<dyn Error>> {
+fn write_to_disk(mut dest: PathBuf, crawling: &Crawling) {
     let file_name = hash(&crawling);
     if let Some(domain_prefix) = crawling.get_domain() {
-        let mut new_dest = dest.clone();
-        new_dest.push(format!("{}-{}", domain_prefix, file_name));
-        let mut full_path = File::create(new_dest)?;
-        crawling.write(&mut full_path)?;
-        return Ok(());
+        dest.push(format!("{}-{}", domain_prefix, file_name));
+        let mut full_path = File::create(dest).unwrap();
+        crawling.write(&mut full_path).unwrap_or_else(|_| {
+            loge!(format!("Error creating file \"{}\"", file_name));
+        });
     }
-    Err(Box::from(format!("Error creating file \"{}\"", file_name)))
 }
