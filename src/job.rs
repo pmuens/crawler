@@ -87,7 +87,7 @@ impl JobQueue {
         if self.queue.len() == self.buffer as usize {
             self.queue.pop_front();
         }
-        if !self.queue.contains(&value) {
+        if !self.visited.contains(&value) && !self.queue.contains(&value) {
             self.queue.push_back(value);
         }
     }
@@ -134,6 +134,23 @@ fn job_queue() {
     assert_eq!(q.dequeue(), Some(job_4_c));
     assert_eq!(q.dequeue(), Some(job_6_c));
     assert_eq!(q.dequeue(), None);
+}
+
+#[test]
+fn job_contains() {
+    let mut q = JobQueue::new(10);
+    let job = Job::new(Url::parse("http://example.com").unwrap()).unwrap();
+
+    q.enqueue(job.clone());
+    assert!(q.queue.contains(&job));
+    assert!(!q.visited.contains(&job));
+    q.dequeue();
+    assert!(!q.queue.contains(&job));
+    assert!(q.visited.contains(&job));
+    // trying to enqueue the same job again
+    q.enqueue(job.clone());
+    assert!(!q.queue.contains(&job));
+    assert!(q.visited.contains(&job));
 }
 
 #[test]
