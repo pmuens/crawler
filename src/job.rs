@@ -60,7 +60,7 @@ fn job() {
     assert!(Job::new(to_url("http://example.com/index.txt")).is_some());
     // test against the blacklist
     for ext in BLACKLIST_EXTENSIONS.iter() {
-        let formatted = format!("http://example.com/blacklistes{}", ext);
+        let formatted = format!("http://example.com/blacklisted.{}", ext);
         let url = formatted.as_str();
         assert!(Job::new(to_url(url)).is_none());
     }
