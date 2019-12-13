@@ -1,0 +1,12 @@
+#!/bin/sh
+
+PROJECT_NAME=untitled-crawler
+DESTINATION=~/Desktop/backups
+
+timestamp=$(date +%s)
+filename=$timestamp-$PROJECT_NAME.7z
+
+docker run --rm --workdir /data -it -v "$PWD":/data crazymax/7zip \
+  7za a -p -x!tmp -xr!target -mhe=on "$filename" . && \
+  mkdir -p $DESTINATION && \
+  mv "$filename" $DESTINATION
