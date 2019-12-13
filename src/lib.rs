@@ -25,15 +25,16 @@ pub fn run_single_threaded(url: &str, out_dir: &str) -> Result<(), Box<dyn Error
     let dest = create_ts_directory(out_dir)?;
 
     let url = Url::parse(url)?;
-    queue.enqueue(Job::new(url).unwrap());
+    queue.enqueue(vec![Job::new(url).unwrap()]);
 
-    while let Some(job) = queue.dequeue() {
+    while let Some(mut jobs) = queue.dequeue(1) {
+        let job = jobs.pop().unwrap();
         let crawling = crawl(&job)?;
         let urls = crawling.find_urls();
         if let Some(urls) = urls {
             urls.into_iter()
                 .filter_map(Job::new)
-                .for_each(|job| queue.enqueue(job));
+                .for_each(|job| queue.enqueue(vec![job]));
         }
         write_to_disk(dest.clone(), &crawling);
     }
