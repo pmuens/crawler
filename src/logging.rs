@@ -14,18 +14,6 @@ macro_rules! log {
     };
 }
 
-macro_rules! logi {
-    ($msg:expr) => {
-        log!($msg);
-    };
-}
-
-macro_rules! logw {
-    ($msg:expr) => {
-        println!("WARN - {} - \"{}\"", $crate::logging::formatted_now(), $msg);
-    };
-}
-
 macro_rules! loge {
     ($msg:expr) => {
         eprintln!(
@@ -33,11 +21,5 @@ macro_rules! loge {
             $crate::logging::formatted_now(),
             $msg
         );
-    };
-}
-
-macro_rules! logf {
-    ($msg:expr) => {
-        loge!($msg);
     };
 }
