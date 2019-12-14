@@ -20,8 +20,11 @@ use std::path::PathBuf;
 
 use utils::{create_ts_directory, hash};
 
+// TODO: make this configurable from the outside
+static JOB_QUEUE_BUFFER: usize = 1_000_000;
+
 pub fn run_single_threaded(url: &str, out_dir: &str) -> Result<(), Box<dyn Error>> {
-    let mut queue = JobQueue::new(1_000_000);
+    let mut queue = JobQueue::new(JOB_QUEUE_BUFFER);
     let dest = create_ts_directory(out_dir)?;
 
     let url = Url::parse(url)?;

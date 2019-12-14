@@ -71,11 +71,11 @@ fn job() {
 pub struct JobQueue {
     queue: VecDeque<Job>,
     visited: HashSet<Job>,
-    buffer: u64,
+    buffer: usize,
 }
 
 impl JobQueue {
-    pub fn new(buffer: u64) -> Self {
+    pub fn new(buffer: usize) -> Self {
         JobQueue {
             queue: VecDeque::<Job>::new(),
             visited: HashSet::<Job>::new(),
@@ -86,7 +86,7 @@ impl JobQueue {
     // TODO: there might be a more efficient way to do this
     pub fn enqueue(&mut self, jobs: Vec<Job>) {
         // remove the oldest n elements if the queue exceeds the buffer size
-        if self.queue.len() + jobs.len() >= self.buffer as usize {
+        if self.queue.len() + jobs.len() >= self.buffer {
             let range = Range {
                 start: 0,
                 end: jobs.len(),
@@ -106,7 +106,7 @@ impl JobQueue {
     // TODO: there might be a more efficient way to do this
     pub fn dequeue(&mut self, count: usize) -> Option<Vec<Job>> {
         // clear the whole set if we exceed the buffer size
-        if self.visited.len() + count >= self.buffer as usize {
+        if self.visited.len() + count >= self.buffer {
             self.visited.clear();
         }
         // dequeue the jobs
