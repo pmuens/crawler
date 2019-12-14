@@ -8,6 +8,9 @@ lazy_static! {
     static ref LINK_REGEX: Regex =
         Regex::new(r#"\s*(?i)href\s*=\s*("([^"]*)"|'[^']*'|([^'">\s]+))"#)
             .unwrap_or_else(|_| panic!("Error parsing Regex"));
+    static ref HTML_STARTINGS: [&'static str; 4] =
+        ["<html", "<HTML", "<!doctype html", "<!DOCTYPE html"];
+    static ref HTML_ENDINGS: [&'static str; 2] = ["html>", "HTML>",];
 }
 
 #[derive(PartialEq, Debug, Hash)]
@@ -25,7 +28,7 @@ pub struct Crawling {
 
 impl Crawling {
     pub fn new(url: Url, content: Vec<u8>) -> Self {
-        let kind = Self::determine_kind(&content);
+        let kind = Self::identify_kind(&content);
         Crawling { url, content, kind }
     }
 
@@ -52,15 +55,11 @@ impl Crawling {
         None
     }
 
-    pub fn determine_kind(content: &[u8]) -> Kind {
+    pub fn identify_kind(content: &[u8]) -> Kind {
         let parsing = String::from_utf8_lossy(content);
-        if parsing.ends_with("html>")
-            || parsing.ends_with("HTML>")
-            || parsing.starts_with("<html")
-            || parsing.starts_with("<HTML")
-            || parsing.starts_with("<!doctype html")
-            || parsing.starts_with("<!DOCTYPE html")
-        {
+        let is_html_start = HTML_STARTINGS.iter().any(|pat| parsing.starts_with(pat));
+        let is_html_end = HTML_ENDINGS.iter().any(|pat| parsing.ends_with(pat));
+        if is_html_start || is_html_end {
             return Kind::Html;
         }
         Kind::Unknown
@@ -144,7 +143,7 @@ fn unknown_crawling_find_urls_invalid_urls() {
 }
 
 #[test]
-fn determine_kind_html() {
+fn identify_kind_html() {
     let url = Url::from_str("http://example.com").unwrap();
 
     let crawling_1 = Crawling::new(url.clone(), b"<!doctype html>Foo Bar".to_vec());
@@ -162,7 +161,7 @@ fn determine_kind_html() {
 }
 
 #[test]
-fn determine_kind_unknown() {
+fn identify_kind_unknown() {
     let url = Url::from_str("http://example.com").unwrap();
 
     let crawling = Crawling::new(url, (&[1, 2, 3, 4, 5, 6]).to_vec());
