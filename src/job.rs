@@ -2,7 +2,6 @@ use reqwest::Client;
 use reqwest::Url;
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
-use std::ops::Range;
 
 lazy_static! {
     static ref CLIENT: Client = Client::new();
@@ -83,43 +82,27 @@ impl JobQueue {
         }
     }
 
-    // TODO: there might be a more efficient way to do this
-    pub fn enqueue(&mut self, jobs: Vec<Job>) {
-        // remove the oldest n elements if the queue exceeds the buffer size
-        if self.queue.len() + jobs.len() >= self.buffer {
-            let range = Range {
-                start: 0,
-                end: jobs.len(),
-            };
-            for _ in range {
-                self.queue.pop_front();
-            }
+    pub fn enqueue(&mut self, job: Job) {
+        // remove the oldest element if the queue exceeds the buffer size
+        if self.queue.len() == self.buffer {
+            self.queue.pop_front();
         }
-        // enqueue the new jobs
-        for job in jobs {
-            if !self.visited.contains(&job) && !self.queue.contains(&job) {
-                self.queue.push_back(job);
-            }
+        // enqueue the new job
+        if !self.visited.contains(&job) && !self.queue.contains(&job) {
+            self.queue.push_back(job);
         }
     }
 
-    // TODO: there might be a more efficient way to do this
-    pub fn dequeue(&mut self, count: usize) -> Option<Vec<Job>> {
+    pub fn dequeue(&mut self) -> Option<Job> {
         // clear the whole set if we exceed the buffer size
-        if self.visited.len() + count >= self.buffer {
+        if self.visited.len() == self.buffer {
             self.visited.clear();
         }
-        // dequeue the jobs
-        let mut jobs = vec![];
-        for _ in 0..count {
-            if let Some(job) = self.queue.pop_front() {
-                // mark as visited when dequeueing it
-                self.visited.insert(job.clone());
-                jobs.push(job);
-            }
-        }
-        if !jobs.is_empty() {
-            return Some(jobs);
+        // dequeue the job
+        if let Some(job) = self.queue.pop_front() {
+            // mark as visited when dequeuing it
+            self.visited.insert(job.clone());
+            return Some(job);
         }
         None
     }
@@ -137,19 +120,20 @@ fn job_queue() {
     let job_5 = to_job("http://example.com/3");
     let job_6 = to_job("http://example.com/4");
     let job_7 = to_job("http://example.com/4");
-    let job_1_c = job_1.clone(); // /1
-    let job_3_c = job_3.clone(); // /2
-    let job_4_c = job_4.clone(); // /3
-    let job_6_c = job_6.clone(); // /4
 
-    q.enqueue(vec![job_1, job_2, job_3]);
-    q.enqueue(vec![job_4, job_5, job_6, job_7]);
+    q.enqueue(job_1.clone());
+    q.enqueue(job_2.clone());
+    q.enqueue(job_3.clone());
+    q.enqueue(job_4.clone());
+    q.enqueue(job_5.clone());
+    q.enqueue(job_6.clone());
+    q.enqueue(job_7.clone());
 
-    assert_eq!(q.dequeue(3), Some(vec![job_1_c, job_3_c, job_4_c]));
-    // NOTE: here we're trying to dequeue more items than there are in the queue
-    assert_eq!(q.dequeue(4), Some(vec![job_6_c]));
-    assert_eq!(q.dequeue(10), None);
-    assert_eq!(q.dequeue(1), None);
+    assert_eq!(q.dequeue(), Some(job_1));
+    assert_eq!(q.dequeue(), Some(job_3));
+    assert_eq!(q.dequeue(), Some(job_4));
+    assert_eq!(q.dequeue(), Some(job_6));
+    assert_eq!(q.dequeue(), None);
 }
 
 #[test]
@@ -157,14 +141,14 @@ fn job_queue_contains() {
     let mut q = JobQueue::new(10);
     let job = Job::new(Url::parse("http://example.com").unwrap()).unwrap();
 
-    q.enqueue(vec![job.clone()]);
+    q.enqueue(job.clone());
     assert!(q.queue.contains(&job));
     assert!(!q.visited.contains(&job));
-    q.dequeue(1);
+    q.dequeue();
     assert!(!q.queue.contains(&job));
     assert!(q.visited.contains(&job));
     // trying to enqueue the same job again
-    q.enqueue(vec![job.clone()]);
+    q.enqueue(job.clone());
     assert!(!q.queue.contains(&job));
     assert!(q.visited.contains(&job));
 }
@@ -179,16 +163,17 @@ fn job_queue_buffer_queue() {
     let job_3 = to_job("http://example.com/3");
     let job_4 = to_job("http://example.com/4");
     let job_5 = to_job("http://example.com/5");
-    let job_3_c = job_3.clone(); // /3
-    let job_4_c = job_4.clone(); // /4
-    let job_5_c = job_5.clone(); // /5
 
-    q.enqueue(vec![job_1, job_2, job_3]);
-    q.enqueue(vec![job_4, job_5]);
+    q.enqueue(job_1.clone());
+    q.enqueue(job_2.clone());
+    q.enqueue(job_3.clone());
+    q.enqueue(job_4.clone());
+    q.enqueue(job_5.clone());
 
-    assert_eq!(q.dequeue(2), Some(vec![job_3_c, job_4_c]));
-    assert_eq!(q.dequeue(1), Some(vec![job_5_c]));
-    assert_eq!(q.dequeue(1), None);
+    assert_eq!(q.dequeue(), Some(job_3));
+    assert_eq!(q.dequeue(), Some(job_4));
+    assert_eq!(q.dequeue(), Some(job_5));
+    assert_eq!(q.dequeue(), None);
 }
 
 #[test]
@@ -201,13 +186,17 @@ fn job_queue_buffer_visited() {
     let job_3 = to_job("http://example.com/3");
     let job_4 = to_job("http://example.com/4");
 
-    q.enqueue(vec![job_1.clone(), job_2.clone()]);
-    q.dequeue(2);
+    q.enqueue(job_1.clone());
+    q.enqueue(job_2.clone());
+    q.dequeue();
+    q.dequeue();
     assert_eq!(q.visited.len(), 2);
     assert!(q.visited.contains(&job_1));
     assert!(q.visited.contains(&job_2));
-    q.enqueue(vec![job_3.clone(), job_4.clone()]);
-    q.dequeue(2);
+    q.enqueue(job_3.clone());
+    q.enqueue(job_4.clone());
+    q.dequeue();
+    q.dequeue();
     assert_eq!(q.visited.len(), 2);
     assert!(q.visited.contains(&job_3));
     assert!(q.visited.contains(&job_4));
