@@ -30,15 +30,16 @@ pub fn run_single_threaded(url: &str, out_dir: &str) -> Result<(), Box<dyn Error
     let url = Url::parse(url)?;
     queue.enqueue(Job::new(url).unwrap());
 
-    while let Some(mut job) = queue.dequeue() {
-        let crawling = crawl(&job)?;
-        let urls = crawling.find_urls();
-        if let Some(urls) = urls {
-            urls.into_iter()
-                .filter_map(Job::new)
-                .for_each(|job| queue.enqueue(job));
+    while let Some(job) = queue.dequeue() {
+        if let Ok(crawling) = crawl(&job) {
+            let urls = crawling.find_urls();
+            if let Some(urls) = urls {
+                urls.into_iter()
+                    .filter_map(Job::new)
+                    .for_each(|job| queue.enqueue(job));
+            }
+            write_to_disk(dest.clone(), &crawling);
         }
-        write_to_disk(dest.clone(), &crawling);
     }
 
     Ok(())
