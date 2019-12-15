@@ -124,8 +124,15 @@ fn crawl(job: &Job) -> Result<Crawling, Box<dyn Error>> {
 
 fn write_to_disk(mut dest: PathBuf, crawling: &Crawling) {
     let file_name = hash(&crawling);
-    if let Some(domain_prefix) = crawling.get_domain() {
-        dest.push(format!("{}-{}", domain_prefix, file_name));
+    let has_domain = crawling.get_domain().is_some();
+    let has_file_extension = crawling.get_file_extension().is_some();
+    if has_domain && has_file_extension {
+        let domain_prefix = crawling.get_domain().unwrap();
+        let file_extension = crawling.get_file_extension().unwrap();
+        dest.push(format!(
+            "{}-{}.{}",
+            domain_prefix, file_name, file_extension
+        ));
         let mut full_path = File::create(dest).unwrap();
         crawling.write(&mut full_path).unwrap_or_else(|_| {
             loge!(format!("Error creating file \"{}\"", file_name));
