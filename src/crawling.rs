@@ -13,6 +13,7 @@ lazy_static! {
 #[derive(PartialEq, Debug, Hash)]
 pub enum Kind {
     Html,
+    Pdf,
     Unknown,
 }
 
@@ -55,6 +56,8 @@ impl Crawling {
     pub fn identify_kind(content_type: &str) -> Kind {
         if content_type.contains("html") {
             return Kind::Html;
+        } else if content_type.contains("pdf") {
+            return Kind::Pdf;
         }
         Kind::Unknown
     }
@@ -150,6 +153,15 @@ fn identify_kind_html() {
     );
 
     assert_eq!(crawling.kind, Kind::Html);
+}
+
+#[test]
+fn identify_kind_pdf() {
+    let url = Url::from_str("http://example.com/foo.pdf").unwrap();
+
+    let crawling = Crawling::new(url.clone(), "application/pdf", (&[1, 2, 3]).to_vec());
+
+    assert_eq!(crawling.kind, Kind::Pdf);
 }
 
 #[test]
