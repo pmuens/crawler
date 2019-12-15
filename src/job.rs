@@ -12,6 +12,9 @@ lazy_static! {
         // NOTE: we might want to re-include the following extensions in future releases
         ".xml"
     ];
+    static ref BLACKLIST_DOMAINS: [&'static str; 4] = [
+        "google", "yahoo", "facebook", "bing"
+    ];
 }
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
@@ -22,10 +25,13 @@ pub struct Job {
 impl Job {
     pub fn new(url: Url) -> Option<Self> {
         let url_str = url.as_str();
-        if BLACKLIST_EXTENSIONS
+        let blacklisted_extension = BLACKLIST_EXTENSIONS
             .iter()
-            .any(|&ext| url_str.ends_with(ext))
-        {
+            .any(|&ext| url_str.ends_with(ext));
+        let blacklisted_domain = BLACKLIST_DOMAINS
+            .iter()
+            .any(|&domain| url_str.contains(format!("{}.", domain).as_str()));
+        if blacklisted_extension || blacklisted_domain {
             return None;
         }
         Some(Job { url })
@@ -68,9 +74,13 @@ fn job() {
     assert!(Job::new(to_url("http://example.com/index.pdf")).is_some());
     assert!(Job::new(to_url("http://example.com/index.ps")).is_some());
     assert!(Job::new(to_url("http://example.com/index.txt")).is_some());
-    // test against the blacklist
     for ext in BLACKLIST_EXTENSIONS.iter() {
         let formatted = format!("http://example.com/blacklisted.{}", ext);
+        let url = formatted.as_str();
+        assert!(Job::new(to_url(url)).is_none());
+    }
+    for domain in BLACKLIST_DOMAINS.iter() {
+        let formatted = format!("http://{}.com/foo", domain);
         let url = formatted.as_str();
         assert!(Job::new(to_url(url)).is_none());
     }
