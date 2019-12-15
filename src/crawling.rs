@@ -70,6 +70,14 @@ impl Crawling {
     pub fn get_domain(&self) -> Option<&str> {
         self.url.domain()
     }
+
+    pub fn get_file_extension(&self) -> Option<&str> {
+        match self.kind {
+            Kind::Html => Some(".html"),
+            Kind::Pdf => Some(".pdf"),
+            Kind::Unknown => None,
+        }
+    }
 }
 
 #[test]
@@ -191,4 +199,17 @@ fn crawling_get_domain() {
     let crawling = Crawling::new(url, "text/html", b"Hello World!".to_vec());
 
     assert_eq!(crawling.get_domain(), Some("example.com"));
+}
+
+#[test]
+fn crawling_get_file_extension() {
+    let url = Url::from_str("http://example.com").unwrap();
+
+    let crawling_html = Crawling::new(url.clone(), "text/html", b"Hello World!".to_vec());
+    let crawling_pdf = Crawling::new(url.clone(), "application/pdf", (&[1, 2, 3]).to_vec());
+    let crawling_unknown = Crawling::new(url.clone(), "application/foo", (&[1, 2, 3]).to_vec());
+
+    assert_eq!(crawling_html.get_file_extension(), Some(".html"));
+    assert_eq!(crawling_pdf.get_file_extension(), Some(".pdf"));
+    assert_eq!(crawling_unknown.get_file_extension(), None);
 }
