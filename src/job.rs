@@ -1,3 +1,4 @@
+use reqwest::header::CONTENT_TYPE;
 use reqwest::Client;
 use reqwest::Url;
 use std::collections::{HashSet, VecDeque};
@@ -34,16 +35,25 @@ impl Job {
         self.url.to_owned()
     }
 
-    pub fn fetch(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub fn fetch(&self) -> Result<(String, Vec<u8>), Box<dyn Error>> {
         let mut resp = CLIENT.get(&self.url.to_string()).send()?;
         if !resp.status().is_success() {
             Err(resp.status().to_string())?;
         }
 
-        let mut buffer: Vec<u8> = vec![];
-        resp.copy_to(&mut buffer)?;
+        if let Some(header) = resp.headers().get(CONTENT_TYPE) {
+            let content_type = header.to_str().unwrap().to_string();
 
-        Ok(buffer)
+            let mut buffer: Vec<u8> = vec![];
+            resp.copy_to(&mut buffer)?;
+
+            return Ok((content_type, buffer));
+        }
+
+        Err(Box::from(format!(
+            "Invalid Content-Type for URL \"{}\"",
+            self.url
+        )))
     }
 }
 

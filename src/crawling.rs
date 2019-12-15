@@ -8,9 +8,6 @@ lazy_static! {
     static ref LINK_REGEX: Regex =
         Regex::new(r#"\s*(?i)href\s*=\s*("([^"]*)"|'[^']*'|([^'">\s]+))"#)
             .unwrap_or_else(|_| panic!("Error parsing Regex"));
-    static ref HTML_STARTINGS: [&'static str; 4] =
-        ["<html", "<HTML", "<!doctype html", "<!DOCTYPE html"];
-    static ref HTML_ENDINGS: [&'static str; 2] = ["html>", "HTML>",];
 }
 
 #[derive(PartialEq, Debug, Hash)]
@@ -27,8 +24,8 @@ pub struct Crawling {
 }
 
 impl Crawling {
-    pub fn new(url: Url, content: Vec<u8>) -> Self {
-        let kind = Self::identify_kind(&content);
+    pub fn new(url: Url, content_type: &str, content: Vec<u8>) -> Self {
+        let kind = Self::identify_kind(content_type);
         Crawling { url, content, kind }
     }
 
@@ -55,11 +52,8 @@ impl Crawling {
         None
     }
 
-    pub fn identify_kind(content: &[u8]) -> Kind {
-        let parsing = String::from_utf8_lossy(content);
-        let is_html_start = HTML_STARTINGS.iter().any(|pat| parsing.starts_with(pat));
-        let is_html_end = HTML_ENDINGS.iter().any(|pat| parsing.ends_with(pat));
-        if is_html_start || is_html_end {
+    pub fn identify_kind(content_type: &str) -> Kind {
+        if content_type.contains("html") {
             return Kind::Html;
         }
         Kind::Unknown
@@ -82,6 +76,7 @@ fn html_crawling_find_urls_some_urls() {
 
     let crawling = Crawling::new(
         url,
+        "text/html",
         b"<html>\
             Read the <a href=\"news\">News</a>, go back to\
             <a href=\"/home?foo=bar&baz=qux#foo\">Home</a> or visit\
@@ -108,7 +103,7 @@ fn html_crawling_find_urls_no_urls() {
     let get_url = |url: &str| Url::from_str(url).unwrap();
     let url = get_url("http://example.com");
 
-    let crawling = Crawling::new(url, b"<html>Hello World</html>".to_vec());
+    let crawling = Crawling::new(url, "text/html", b"<html>Hello World</html>".to_vec());
 
     assert_eq!(crawling.kind, Kind::Html);
     assert_eq!(crawling.find_urls(), None);
@@ -121,6 +116,7 @@ fn html_crawling_find_urls_single_quotes() {
 
     let crawling = Crawling::new(
         url,
+        "text/html",
         b"<html><a href='http://google.com'></a></html>".to_vec(),
     );
 
@@ -135,6 +131,7 @@ fn unknown_crawling_find_urls_invalid_urls() {
 
     let crawling = Crawling::new(
         url,
+        "application/foo",
         b"This is not valid <a href=\"html\">HTML</a>!\"".to_vec(),
     );
 
@@ -146,25 +143,20 @@ fn unknown_crawling_find_urls_invalid_urls() {
 fn identify_kind_html() {
     let url = Url::from_str("http://example.com").unwrap();
 
-    let crawling_1 = Crawling::new(url.clone(), b"<!doctype html>Foo Bar".to_vec());
-    assert_eq!(crawling_1.kind, Kind::Html);
-    let crawling_2 = Crawling::new(url.clone(), b"<!DOCTYPE html>Foo Bar".to_vec());
-    assert_eq!(crawling_2.kind, Kind::Html);
-    let crawling_3 = Crawling::new(url.clone(), b"<html>Foo Bar".to_vec());
-    assert_eq!(crawling_3.kind, Kind::Html);
-    let crawling_4 = Crawling::new(url.clone(), b"<HTML>Foo Bar".to_vec());
-    assert_eq!(crawling_4.kind, Kind::Html);
-    let crawling_5 = Crawling::new(url.clone(), b"Foo Bar</html>".to_vec());
-    assert_eq!(crawling_5.kind, Kind::Html);
-    let crawling_6 = Crawling::new(url.clone(), b"Foo Bar</HTML>".to_vec());
-    assert_eq!(crawling_6.kind, Kind::Html);
+    let crawling = Crawling::new(
+        url.clone(),
+        "text/html",
+        b"<!doctype html>Foo Bar</html>".to_vec(),
+    );
+
+    assert_eq!(crawling.kind, Kind::Html);
 }
 
 #[test]
 fn identify_kind_unknown() {
     let url = Url::from_str("http://example.com").unwrap();
 
-    let crawling = Crawling::new(url, (&[1, 2, 3, 4, 5, 6]).to_vec());
+    let crawling = Crawling::new(url, "application/foo", (&[1, 2, 3, 4, 5, 6]).to_vec());
 
     assert_eq!(crawling.kind, Kind::Unknown);
 }
@@ -174,7 +166,7 @@ fn crawling_write() {
     let url = Url::from_str("http://example.com").unwrap();
     let mut dest: Vec<u8> = vec![];
 
-    let crawling = Crawling::new(url, b"Hello World!".to_vec());
+    let crawling = Crawling::new(url, "text/html", b"Hello World!".to_vec());
     let result = crawling.write(&mut dest);
 
     assert!(result.is_ok());
@@ -184,7 +176,7 @@ fn crawling_write() {
 #[test]
 fn crawling_get_domain() {
     let url = Url::from_str("http://example.com/foo?bar&baz=qux#some").unwrap();
-    let crawling = Crawling::new(url, b"Hello World!".to_vec());
+    let crawling = Crawling::new(url, "text/html", b"Hello World!".to_vec());
 
     assert_eq!(crawling.get_domain(), Some("example.com"));
 }

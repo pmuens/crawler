@@ -118,8 +118,8 @@ fn persisting_threads(
 
 fn crawl(job: &Job) -> Result<Crawling, Box<dyn Error>> {
     log!(format!("GET {}", job.get_url()));
-    let content = job.fetch()?;
-    Ok(Crawling::new(job.get_url(), content))
+    let (content_type, content) = job.fetch()?;
+    Ok(Crawling::new(job.get_url(), content_type.as_str(), content))
 }
 
 fn write_to_disk(mut dest: PathBuf, crawling: &Crawling) {
