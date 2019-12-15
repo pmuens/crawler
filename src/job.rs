@@ -6,11 +6,11 @@ use std::error::Error;
 
 lazy_static! {
     static ref CLIENT: Client = Client::new();
-    static ref BLACKLIST_EXTENSIONS: [&'static str; 14] = [
-        ".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".tiff", ".ico", ".json", ".woff2",
-        ".csv", ".xls", ".xlsx",
-        // NOTE: we might want to re-include the following extensions in future releases
-        ".xml"
+    static ref BLACKLIST_CONTENT_TYPES: [&'static str; 15] = [
+        "css", "js", "png", "jpg", "jpeg", "gif", "tiff", "ico", "svg", "json", "woff2",
+        "csv", "xls", "xlsx",
+        // NOTE: we might want to re-include the following content types in future releases
+        "xml"
     ];
     static ref BLACKLIST_DOMAINS: [&'static str; 4] = [
         "google", "yahoo", "facebook", "bing"
@@ -25,13 +25,13 @@ pub struct Job {
 impl Job {
     pub fn new(url: Url) -> Option<Self> {
         let url_str = url.as_str();
-        let blacklisted_extension = BLACKLIST_EXTENSIONS
+        let blacklisted_content_type = BLACKLIST_CONTENT_TYPES
             .iter()
-            .any(|&ext| url_str.ends_with(ext));
+            .any(|&t| url_str.contains(format!(".{}", t).as_str()));
         let blacklisted_domain = BLACKLIST_DOMAINS
             .iter()
             .any(|&domain| url_str.contains(format!("{}.", domain).as_str()));
-        if blacklisted_extension || blacklisted_domain {
+        if blacklisted_content_type || blacklisted_domain {
             return None;
         }
         Some(Job { url })
@@ -49,6 +49,16 @@ impl Job {
 
         if let Some(header) = resp.headers().get(CONTENT_TYPE) {
             let content_type = header.to_str().unwrap().to_string();
+
+            if BLACKLIST_CONTENT_TYPES
+                .iter()
+                .any(|&t| content_type.contains(t))
+            {
+                return Err(Box::from(format!(
+                    "Blacklisted Content-Type \"{}\" for URL \"{}\"",
+                    content_type, self.url
+                )));
+            }
 
             let mut buffer: Vec<u8> = vec![];
             resp.copy_to(&mut buffer)?;
@@ -74,8 +84,8 @@ fn job() {
     assert!(Job::new(to_url("http://example.com/index.pdf")).is_some());
     assert!(Job::new(to_url("http://example.com/index.ps")).is_some());
     assert!(Job::new(to_url("http://example.com/index.txt")).is_some());
-    for ext in BLACKLIST_EXTENSIONS.iter() {
-        let formatted = format!("http://example.com/blacklisted.{}", ext);
+    for t in BLACKLIST_CONTENT_TYPES.iter() {
+        let formatted = format!("http://example.com/blacklisted.{}", t);
         let url = formatted.as_str();
         assert!(Job::new(to_url(url)).is_none());
     }
