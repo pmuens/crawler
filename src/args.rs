@@ -10,11 +10,15 @@ pub struct Args<'a> {
 impl<'a> Args<'a> {
     pub fn new(args: &'a [String]) -> Result<Self, Box<dyn Error>> {
         if args.len() == 4 {
-            return Ok(Args {
+            let args = Args {
                 url: args[1].as_str(),
                 out_dir: args[2].as_str(),
                 num_threads: args[3].parse::<usize>().unwrap(),
-            });
+            };
+            if !args.num_threads % 2 == 0 {
+                return Err(Box::from("NUM_THREADS must be even"));
+            }
+            return Ok(args);
         }
         Err(Box::from("Usage: crawler URL OUT_DIR NUM_THREADS"))
     }
@@ -26,20 +30,34 @@ fn args_success() {
         "file".to_string(),
         "http://example.com".to_string(),
         "./crawlings".to_string(),
-        "5".to_string(),
+        "6".to_string(),
     ];
     assert_eq!(
         Args::new(&args).unwrap(),
         Args {
             url: "http://example.com",
             out_dir: "./crawlings",
-            num_threads: 5,
+            num_threads: 6,
         }
     );
 }
 
 #[test]
-fn args_failure() {
+fn args_failure_missing_arguments() {
     let args = vec!["file".to_string()];
-    assert!(Args::new(&args).is_err());
+    assert!(Args::new(&args).unwrap_err().to_string().contains("Usage:"));
+}
+
+#[test]
+fn args_failure_num_threads() {
+    let args = vec![
+        "file".to_string(),
+        "http://example.com".to_string(),
+        "./crawlings".to_string(),
+        "3".to_string(),
+    ];
+    assert!(Args::new(&args)
+        .unwrap_err()
+        .to_string()
+        .contains("must be even"));
 }
