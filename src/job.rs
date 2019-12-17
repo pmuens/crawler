@@ -12,8 +12,10 @@ lazy_static! {
         // NOTE: we might want to re-include the following content types in future releases
         "xml"
     ];
-    static ref BLACKLIST_DOMAINS: [&'static str; 4] = [
-        "google", "yahoo", "facebook", "bing"
+    static ref BLACKLIST_DOMAINS: [&'static str; 7] = [
+        "google", "google-analytics", "googleapis", "yahoo", "bing",
+        // NOTE: we might want to re-include the following domains in future releases
+        "facebook", "twitter"
     ];
 }
 
