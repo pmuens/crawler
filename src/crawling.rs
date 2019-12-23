@@ -12,14 +12,13 @@ lazy_static! {
             .unwrap_or_else(|_| panic!("Error parsing Regex"));
 }
 
-#[derive(PartialEq, Debug, Hash)]
+#[derive(PartialEq, Debug)]
 pub enum Kind {
     Html,
     Pdf,
     Unknown,
 }
 
-#[derive(Hash)]
 pub struct Crawling<T>
 where
     T: Persist,

@@ -63,7 +63,6 @@ mod job_tests {
     use std::error::Error;
     use std::sync::Arc;
 
-    #[derive(Clone)]
     struct MockFetcher;
     impl Default for MockFetcher {
         fn default() -> Self {
