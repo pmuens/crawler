@@ -24,40 +24,45 @@ impl<'a> Args<'a> {
     }
 }
 
-#[test]
-fn args_success() {
-    let args = vec![
-        "file".to_string(),
-        "http://example.com".to_string(),
-        "./crawlings".to_string(),
-        "6".to_string(),
-    ];
-    assert_eq!(
-        Args::new(&args).unwrap(),
-        Args {
-            url: "http://example.com",
-            out_dir: "./crawlings",
-            num_threads: 6,
-        }
-    );
-}
+#[cfg(test)]
+mod tests {
+    use crate::args::Args;
 
-#[test]
-fn args_failure_missing_arguments() {
-    let args = vec!["file".to_string()];
-    assert!(Args::new(&args).unwrap_err().to_string().contains("Usage:"));
-}
+    #[test]
+    fn args_success() {
+        let args = vec![
+            "file".to_string(),
+            "http://example.com".to_string(),
+            "./crawlings".to_string(),
+            "6".to_string(),
+        ];
+        assert_eq!(
+            Args::new(&args).unwrap(),
+            Args {
+                url: "http://example.com",
+                out_dir: "./crawlings",
+                num_threads: 6,
+            }
+        );
+    }
 
-#[test]
-fn args_failure_num_threads() {
-    let args = vec![
-        "file".to_string(),
-        "http://example.com".to_string(),
-        "./crawlings".to_string(),
-        "3".to_string(),
-    ];
-    assert!(Args::new(&args)
-        .unwrap_err()
-        .to_string()
-        .contains("must be even"));
+    #[test]
+    fn args_failure_missing_arguments() {
+        let args = vec!["file".to_string()];
+        assert!(Args::new(&args).unwrap_err().to_string().contains("Usage:"));
+    }
+
+    #[test]
+    fn args_failure_num_threads() {
+        let args = vec![
+            "file".to_string(),
+            "http://example.com".to_string(),
+            "./crawlings".to_string(),
+            "3".to_string(),
+        ];
+        assert!(Args::new(&args)
+            .unwrap_err()
+            .to_string()
+            .contains("must be even"));
+    }
 }
