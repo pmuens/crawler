@@ -1,8 +1,8 @@
 extern crate crawler;
 
+use crawler::crawler::Crawler;
+use crawler::shared;
 use crawler::traits::{Fetch, Persist};
-use crawler::Crawler;
-use std::error::Error;
 use std::sync::Mutex;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
@@ -13,7 +13,7 @@ impl MockFetcher {
     }
 }
 impl Fetch for MockFetcher {
-    fn fetch(&self, _url: &str) -> Result<(String, Vec<u8>), Box<dyn Error>> {
+    fn fetch(&self, _url: &str) -> shared::Result<(String, Vec<u8>)> {
         let content_type = "text/html".to_string();
         let content = br###"
             <html>
@@ -53,7 +53,7 @@ impl MockPersister {
     }
 }
 impl Persist for MockPersister {
-    fn persist(&self, content_id: &str, _content: &[u8]) -> Result<usize, Box<dyn Error>> {
+    fn persist(&self, content_id: &str, _content: &[u8]) -> shared::Result<usize> {
         let mut dest = self.dest.lock().unwrap();
         dest.push(content_id.to_string());
         Ok(content_id.len())

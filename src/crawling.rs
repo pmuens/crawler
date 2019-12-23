@@ -1,8 +1,9 @@
+use crate::error::CrawlerError::PersistingError;
 use crate::lib_utils::hash;
+use crate::shared;
 use crate::traits::Persist;
 use regex::Regex;
 use reqwest::Url;
-use std::error::Error;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -75,7 +76,7 @@ where
         Kind::Unknown
     }
 
-    pub fn write(&self) -> Result<usize, Box<dyn Error>> {
+    pub fn write(&self) -> shared::Result<usize> {
         let has_domain = self.get_domain().is_some();
         let has_file_extension = self.get_file_extension().is_some();
         if has_domain && has_file_extension {
@@ -87,7 +88,7 @@ where
             let content_id = formatted_str.as_str();
             return self.persister.persist(content_id, content);
         }
-        Err(Box::from("Failed to write Crawling"))
+        Err(PersistingError("Failed to write Crawling".to_string()))
     }
 
     pub fn get_domain(&self) -> Option<&str> {
@@ -106,11 +107,11 @@ where
 #[cfg(test)]
 mod tests {
     use crate::crawling::{Crawling, Kind};
+    use crate::shared;
     use crate::traits::Persist;
     use reqwest::Url;
     use std::cell::RefCell;
     use std::collections::HashMap;
-    use std::error::Error;
     use std::str::FromStr;
     use std::sync::Arc;
 
@@ -125,7 +126,7 @@ mod tests {
         }
     }
     impl Persist for MockPersister {
-        fn persist(&self, content_id: &str, content: &[u8]) -> Result<usize, Box<dyn Error>> {
+        fn persist(&self, content_id: &str, content: &[u8]) -> shared::Result<usize> {
             let mut dest = self.dest.borrow_mut();
             dest.insert(
                 content_id.to_string(),

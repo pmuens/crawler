@@ -1,7 +1,7 @@
 use crate::job::BLACKLIST_CONTENT_TYPES;
 use crate::lib_utils::create_ts_directory;
+use crate::shared;
 use crate::traits::{Fetch, Persist};
-use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -24,19 +24,19 @@ pub struct FSPersister {
     out_dir: PathBuf,
 }
 impl FSPersister {
-    pub fn new(root_dir: &str) -> Result<Self, Box<dyn Error>> {
+    pub fn new(root_dir: &str) -> shared::Result<Self> {
         // we need to compute the value for `out_dir` in the `new` method here to ensure
         // that only 1 directory is created when using the `Persister`
         let out_dir = Self::create_out_dir(root_dir)?;
         Ok(FSPersister { out_dir })
     }
 
-    fn create_out_dir(root_dir: &str) -> Result<PathBuf, Box<dyn Error>> {
+    fn create_out_dir(root_dir: &str) -> shared::Result<PathBuf> {
         create_ts_directory(root_dir)
     }
 }
 impl Persist for FSPersister {
-    fn persist(&self, content_id: &str, content: &[u8]) -> Result<usize, Box<dyn Error>> {
+    fn persist(&self, content_id: &str, content: &[u8]) -> shared::Result<usize> {
         let mut out_dir = self.out_dir.clone();
         out_dir.push(content_id);
         let mut full_path = File::create(out_dir).unwrap();

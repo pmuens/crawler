@@ -1,8 +1,8 @@
 use crawler::args::Args;
 use crawler::bin_utils::{FSPersister, Fetcher};
-use crawler::Crawler;
+use crawler::crawler::Crawler;
+use crawler::shared;
 use std::env::args;
-use std::error::Error;
 
 fn main() {
     run_binary().unwrap_or_else(|err| {
@@ -11,7 +11,7 @@ fn main() {
     });
 }
 
-fn run_binary() -> Result<(), Box<dyn Error>> {
+fn run_binary() -> shared::Result<()> {
     let arguments: Vec<String> = args().collect();
     let args = Args::new(&arguments)?;
 

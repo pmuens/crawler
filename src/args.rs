@@ -1,4 +1,5 @@
-use std::error::Error;
+use crate::error::CrawlerError::ParsingError;
+use crate::shared;
 
 #[derive(PartialEq, Debug)]
 pub struct Args<'a> {
@@ -8,7 +9,7 @@ pub struct Args<'a> {
 }
 
 impl<'a> Args<'a> {
-    pub fn new(args: &'a [String]) -> Result<Self, Box<dyn Error>> {
+    pub fn new(args: &'a [String]) -> shared::Result<Self> {
         if args.len() == 4 {
             let args = Args {
                 url: args[1].as_str(),
@@ -17,7 +18,9 @@ impl<'a> Args<'a> {
             };
             return Ok(args);
         }
-        Err(Box::from("Usage: crawler URL OUT_DIR NUM_THREADS"))
+        Err(ParsingError(
+            "Usage: crawler URL OUT_DIR NUM_THREADS".to_string(),
+        ))
     }
 }
 

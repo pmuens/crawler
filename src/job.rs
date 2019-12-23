@@ -1,7 +1,7 @@
+use crate::shared;
 use crate::traits::Fetch;
 use reqwest::Url;
 use std::collections::{HashSet, VecDeque};
-use std::error::Error;
 use std::hash::Hash;
 use std::sync::Arc;
 
@@ -50,7 +50,7 @@ where
         self.url.to_owned()
     }
 
-    pub fn fetch(&self) -> Result<(String, Vec<u8>), Box<dyn Error>> {
+    pub fn fetch(&self) -> shared::Result<(String, Vec<u8>)> {
         self.fetcher.fetch(self.url.as_str())
     }
 }
@@ -58,9 +58,9 @@ where
 #[cfg(test)]
 mod job_tests {
     use crate::job::{Job, BLACKLIST_CONTENT_TYPES, BLACKLIST_DOMAINS};
+    use crate::shared;
     use crate::traits::Fetch;
     use reqwest::Url;
-    use std::error::Error;
     use std::sync::Arc;
 
     struct MockFetcher;
@@ -70,7 +70,7 @@ mod job_tests {
         }
     }
     impl Fetch for MockFetcher {
-        fn fetch(&self, _url: &str) -> Result<(String, Vec<u8>), Box<dyn Error>> {
+        fn fetch(&self, _url: &str) -> shared::Result<(String, Vec<u8>)> {
             let content_type = "text/html".to_string();
             let content = vec![1, 2, 3, 4];
             Ok((content_type, content))

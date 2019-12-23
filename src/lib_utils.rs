@@ -1,9 +1,9 @@
 use crate::crawling::Crawling;
 use crate::job::Job;
+use crate::shared;
 use crate::traits::{Fetch, Persist};
 use chrono::{DateTime, Utc};
 use std::collections::hash_map::DefaultHasher;
-use std::error::Error;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
@@ -18,7 +18,7 @@ where
     hasher.finish().to_string()
 }
 
-pub fn create_ts_directory(prefix: &str) -> Result<PathBuf, Box<dyn Error>> {
+pub fn create_ts_directory(prefix: &str) -> shared::Result<PathBuf> {
     let system_time = SystemTime::now();
     let date_time: DateTime<Utc> = system_time.into();
     let ts = date_time.format("%Y-%m-%d--%H-%M-%S--%z").to_string();

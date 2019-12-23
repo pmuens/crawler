@@ -1,20 +1,21 @@
+use crate::error::CrawlerError::{ContentTypeError, RequestError};
+use crate::shared;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::Client;
-use std::error::Error;
 
 lazy_static! {
     static ref CLIENT: Client = Client::new();
 }
 
 pub trait Persist {
-    fn persist(&self, content_id: &str, content: &[u8]) -> Result<usize, Box<dyn Error>>;
+    fn persist(&self, content_id: &str, content: &[u8]) -> shared::Result<usize>;
 }
 
 pub trait Fetch {
-    fn fetch(&self, url: &str) -> Result<(String, Vec<u8>), Box<dyn Error>> {
+    fn fetch(&self, url: &str) -> shared::Result<(String, Vec<u8>)> {
         let mut resp = CLIENT.get(url).send()?;
         if !resp.status().is_success() {
-            return Err(Box::from(resp.status().to_string()));
+            return Err(RequestError(format!("{}", resp.status())));
         }
 
         if let Some(header) = resp.headers().get(CONTENT_TYPE) {
@@ -27,11 +28,10 @@ pub trait Fetch {
                     .into_iter()
                     .any(|t| content_type.contains(t))
             {
-                let msg = format!(
+                return Err(ContentTypeError(format!(
                     "Blacklisted Content-Type \"{}\" for URL \"{}\"",
-                    content_type, &url
-                );
-                return Err(Box::from(msg));
+                    content_type, &url,
+                )));
             }
 
             let mut buffer: Vec<u8> = vec![];
@@ -40,8 +40,10 @@ pub trait Fetch {
             return Ok((content_type, buffer));
         }
 
-        let msg = format!("Invalid Content-Type for URL \"{}\"", &url);
-        Err(Box::from(msg))
+        Err(ContentTypeError(format!(
+            "Invalid Content-Type for URL \"{}\"",
+            &url,
+        )))
     }
 
     fn get_content_type_blacklist<'a>(&self) -> Option<Vec<&'a str>> {

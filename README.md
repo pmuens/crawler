@@ -20,7 +20,7 @@ cargo run --bin crawler http://example.com ./crawlings 10
 extern crate crawler;
 
 use crawler::traits::{Fetch, Persist};
-use crawler::Crawler;
+use crawler::crawler::Crawler;
 
 // ... trait implementations for `Fetch` and `Persist`
 
