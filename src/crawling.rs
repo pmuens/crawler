@@ -1,8 +1,9 @@
+use crate::traits::Persist;
 use regex::Regex;
 use reqwest::Url;
 use std::error::Error;
-use std::io::Write;
 use std::str::FromStr;
+use std::sync::Arc;
 
 lazy_static! {
     static ref LINK_REGEX: Regex =
@@ -18,16 +19,28 @@ pub enum Kind {
 }
 
 #[derive(Hash)]
-pub struct Crawling {
+pub struct Crawling<T>
+where
+    T: Persist,
+{
+    persister: Arc<T>,
     url: Url,
     content: Vec<u8>,
     kind: Kind,
 }
 
-impl Crawling {
-    pub fn new(url: Url, content_type: &str, content: Vec<u8>) -> Self {
+impl<T> Crawling<T>
+where
+    T: Persist,
+{
+    pub fn new(persister: Arc<T>, url: Url, content_type: &str, content: Vec<u8>) -> Self {
         let kind = Self::identify_kind(content_type);
-        Crawling { url, content, kind }
+        Crawling {
+            persister,
+            url,
+            content,
+            kind,
+        }
     }
 
     pub fn find_urls(&self) -> Option<Vec<Url>> {
@@ -62,9 +75,17 @@ impl Crawling {
         Kind::Unknown
     }
 
-    pub fn write<T: Write>(&self, dest: &mut T) -> Result<(), Box<dyn Error>> {
-        dest.write_all(&self.content[..])?;
-        Ok(())
+    pub fn write(&self) -> Result<usize, Box<dyn Error>> {
+        let has_domain = self.get_domain().is_some();
+        let has_file_extension = self.get_file_extension().is_some();
+        if has_domain && has_file_extension {
+            let domain_prefix = self.get_domain().unwrap();
+            let file_extension = self.get_file_extension().unwrap();
+            let formatted_str = format!("{}{}", domain_prefix, file_extension);
+            let content_id = formatted_str.as_str();
+            return self.persister.persist(content_id, self.content.as_slice());
+        }
+        Err(Box::from("Failed to write Crawling"))
     }
 
     pub fn get_domain(&self) -> Option<&str> {
@@ -80,136 +101,224 @@ impl Crawling {
     }
 }
 
-#[test]
-fn html_crawling_find_urls_some_urls() {
-    let get_url = |url: &str| Url::from_str(url).unwrap();
-    let url = get_url("http://example.com");
+#[cfg(test)]
+mod tests {
+    use crate::crawling::{Crawling, Kind};
+    use crate::traits::Persist;
+    use reqwest::Url;
+    use std::cell::RefCell;
+    use std::error::Error;
+    use std::io::Write;
+    use std::str::FromStr;
+    use std::sync::Arc;
 
-    let crawling = Crawling::new(
-        url,
-        "text/html",
-        b"<html>\
+    #[derive(Clone)]
+    struct MockPersister {
+        dest: RefCell<Vec<u8>>,
+    }
+    impl Default for MockPersister {
+        fn default() -> Self {
+            MockPersister {
+                dest: RefCell::new(vec![]),
+            }
+        }
+    }
+    impl Persist for MockPersister {
+        fn persist(&self, content_id: &str, content: &[u8]) -> Result<usize, Box<dyn Error>> {
+            let mut dest = self.dest.borrow_mut();
+
+            // combine the `content` with the `content_id` to check whether both parameters
+            // are set correctly
+            let final_content = format!("{} {}", content_id, String::from_utf8_lossy(content));
+
+            dest.write_all(final_content.as_bytes())?;
+            Ok(final_content.len())
+        }
+    }
+
+    fn get_url(url: &str) -> Url {
+        Url::from_str(url).unwrap()
+    }
+    fn get_mock_persister() -> Arc<MockPersister> {
+        Arc::new(MockPersister::default())
+    }
+
+    #[test]
+    fn html_crawling_find_urls_some_urls() {
+        let url = get_url("http://example.com");
+        let persister = get_mock_persister();
+
+        let crawling = Crawling::new(
+            persister,
+            url,
+            "text/html",
+            b"<html>\
             Read the <a href=\"news\">News</a>, go back to\
             <a href=\"/home?foo=bar&baz=qux#foo\">Home</a> or visit\
             <a href=\"https://jdoe.com\">Johns Website</a>.\
             <a href=\"mailto:jdoe@example.com\">Contanct Me</a>\
             </html>"
-            .to_vec(),
-    );
+                .to_vec(),
+        );
 
-    assert_eq!(crawling.kind, Kind::Html);
-    assert_eq!(
-        crawling.find_urls(),
-        Some(vec![
-            get_url("http://example.com/news"),
-            get_url("http://example.com/home?foo=bar&baz=qux#foo"),
-            get_url("https://jdoe.com"),
-            get_url("mailto:jdoe@example.com")
-        ])
-    );
-}
+        assert_eq!(crawling.kind, Kind::Html);
+        assert_eq!(
+            crawling.find_urls(),
+            Some(vec![
+                get_url("http://example.com/news"),
+                get_url("http://example.com/home?foo=bar&baz=qux#foo"),
+                get_url("https://jdoe.com"),
+                get_url("mailto:jdoe@example.com")
+            ])
+        );
+    }
 
-#[test]
-fn html_crawling_find_urls_no_urls() {
-    let get_url = |url: &str| Url::from_str(url).unwrap();
-    let url = get_url("http://example.com");
+    #[test]
+    fn html_crawling_find_urls_no_urls() {
+        let url = get_url("http://example.com");
+        let persister = get_mock_persister();
 
-    let crawling = Crawling::new(url, "text/html", b"<html>Hello World</html>".to_vec());
+        let crawling = Crawling::new(
+            persister,
+            url,
+            "text/html",
+            b"<html>Hello World</html>".to_vec(),
+        );
 
-    assert_eq!(crawling.kind, Kind::Html);
-    assert_eq!(crawling.find_urls(), None);
-}
+        assert_eq!(crawling.kind, Kind::Html);
+        assert_eq!(crawling.find_urls(), None);
+    }
 
-#[test]
-fn html_crawling_find_urls_single_quotes() {
-    let get_url = |url: &str| Url::from_str(url).unwrap();
-    let url = get_url("http://example.com");
+    #[test]
+    fn html_crawling_find_urls_single_quotes() {
+        let url = get_url("http://example.com");
+        let persister = get_mock_persister();
 
-    let crawling = Crawling::new(
-        url,
-        "text/html",
-        b"<html><a href='http://google.com'></a></html>".to_vec(),
-    );
+        let crawling = Crawling::new(
+            persister,
+            url,
+            "text/html",
+            b"<html><a href='http://google.com'></a></html>".to_vec(),
+        );
 
-    assert_eq!(crawling.kind, Kind::Html);
-    assert_eq!(crawling.find_urls(), None);
-}
+        assert_eq!(crawling.kind, Kind::Html);
+        assert_eq!(crawling.find_urls(), None);
+    }
 
-#[test]
-fn unknown_crawling_find_urls_invalid_urls() {
-    let get_url = |url: &str| Url::from_str(url).unwrap();
-    let url = get_url("http://example.com");
+    #[test]
+    fn unknown_crawling_find_urls_invalid_urls() {
+        let url = get_url("http://example.com");
+        let persister = get_mock_persister();
 
-    let crawling = Crawling::new(
-        url,
-        "application/foo",
-        b"This is not valid <a href=\"html\">HTML</a>!\"".to_vec(),
-    );
+        let crawling = Crawling::new(
+            persister,
+            url,
+            "application/foo",
+            b"This is not valid <a href=\"html\">HTML</a>!\"".to_vec(),
+        );
 
-    assert_eq!(crawling.kind, Kind::Unknown);
-    assert_eq!(crawling.find_urls(), None);
-}
+        assert_eq!(crawling.kind, Kind::Unknown);
+        assert_eq!(crawling.find_urls(), None);
+    }
 
-#[test]
-fn identify_kind_html() {
-    let url = Url::from_str("http://example.com").unwrap();
+    #[test]
+    fn identify_kind_html() {
+        let url = get_url("http://example.com");
+        let persister = get_mock_persister();
 
-    let crawling = Crawling::new(
-        url.clone(),
-        "text/html",
-        b"<!doctype html>Foo Bar</html>".to_vec(),
-    );
+        let crawling = Crawling::new(
+            persister,
+            url.clone(),
+            "text/html",
+            b"<!doctype html>Foo Bar</html>".to_vec(),
+        );
 
-    assert_eq!(crawling.kind, Kind::Html);
-}
+        assert_eq!(crawling.kind, Kind::Html);
+    }
 
-#[test]
-fn identify_kind_pdf() {
-    let url = Url::from_str("http://example.com/foo.pdf").unwrap();
+    #[test]
+    fn identify_kind_pdf() {
+        let url = get_url("http://example.com/foo.pdf");
+        let persister = get_mock_persister();
 
-    let crawling = Crawling::new(url.clone(), "application/pdf", (&[1, 2, 3]).to_vec());
+        let crawling = Crawling::new(
+            persister,
+            url.clone(),
+            "application/pdf",
+            (&[1, 2, 3]).to_vec(),
+        );
 
-    assert_eq!(crawling.kind, Kind::Pdf);
-}
+        assert_eq!(crawling.kind, Kind::Pdf);
+    }
 
-#[test]
-fn identify_kind_unknown() {
-    let url = Url::from_str("http://example.com").unwrap();
+    #[test]
+    fn identify_kind_unknown() {
+        let url = get_url("http://example.com");
+        let persister = get_mock_persister();
 
-    let crawling = Crawling::new(url, "application/foo", (&[1, 2, 3, 4, 5, 6]).to_vec());
+        let crawling = Crawling::new(
+            persister,
+            url,
+            "application/foo",
+            (&[1, 2, 3, 4, 5, 6]).to_vec(),
+        );
 
-    assert_eq!(crawling.kind, Kind::Unknown);
-}
+        assert_eq!(crawling.kind, Kind::Unknown);
+    }
 
-#[test]
-fn crawling_write() {
-    let url = Url::from_str("http://example.com").unwrap();
-    let mut dest: Vec<u8> = vec![];
+    #[test]
+    fn crawling_write() {
+        let url = get_url("http://example.com");
+        let persister = get_mock_persister();
 
-    let crawling = Crawling::new(url, "text/html", b"Hello World!".to_vec());
-    let result = crawling.write(&mut dest);
+        let crawling = Crawling::new(persister, url, "text/html", b"Hello World!".to_vec());
+        let result = crawling.write();
 
-    assert!(result.is_ok());
-    assert_eq!(dest, crawling.content);
-}
+        let expected_content = b"example.com.html Hello World!";
 
-#[test]
-fn crawling_get_domain() {
-    let url = Url::from_str("http://example.com/foo?bar&baz=qux#some").unwrap();
-    let crawling = Crawling::new(url, "text/html", b"Hello World!".to_vec());
+        assert_eq!(result.unwrap(), 29);
+        assert_eq!(
+            crawling.persister.dest.borrow().to_vec(),
+            expected_content.to_vec()
+        );
+    }
 
-    assert_eq!(crawling.get_domain(), Some("example.com"));
-}
+    #[test]
+    fn crawling_get_domain() {
+        let url = get_url("http://example.com/foo?bar&baz=qux#some");
+        let persister = get_mock_persister();
 
-#[test]
-fn crawling_get_file_extension() {
-    let url = Url::from_str("http://example.com").unwrap();
+        let crawling = Crawling::new(persister, url, "text/html", b"Hello World!".to_vec());
 
-    let crawling_html = Crawling::new(url.clone(), "text/html", b"Hello World!".to_vec());
-    let crawling_pdf = Crawling::new(url.clone(), "application/pdf", (&[1, 2, 3]).to_vec());
-    let crawling_unknown = Crawling::new(url.clone(), "application/foo", (&[1, 2, 3]).to_vec());
+        assert_eq!(crawling.get_domain(), Some("example.com"));
+    }
 
-    assert_eq!(crawling_html.get_file_extension(), Some(".html"));
-    assert_eq!(crawling_pdf.get_file_extension(), Some(".pdf"));
-    assert_eq!(crawling_unknown.get_file_extension(), None);
+    #[test]
+    fn crawling_get_file_extension() {
+        let url = get_url("http://example.com");
+        let persister = get_mock_persister();
+
+        let crawling_html = Crawling::new(
+            persister.clone(),
+            url.clone(),
+            "text/html",
+            b"Hello World!".to_vec(),
+        );
+        let crawling_pdf = Crawling::new(
+            persister.clone(),
+            url.clone(),
+            "application/pdf",
+            (&[1, 2, 3]).to_vec(),
+        );
+        let crawling_unknown = Crawling::new(
+            persister.clone(),
+            url.clone(),
+            "application/foo",
+            (&[1, 2, 3]).to_vec(),
+        );
+
+        assert_eq!(crawling_html.get_file_extension(), Some(".html"));
+        assert_eq!(crawling_pdf.get_file_extension(), Some(".pdf"));
+        assert_eq!(crawling_unknown.get_file_extension(), None);
+    }
 }

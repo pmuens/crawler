@@ -4,138 +4,122 @@ extern crate chrono;
 extern crate regex;
 extern crate reqwest;
 
-mod crawling;
-mod job;
-mod utils;
+pub mod args;
+pub mod bin_utils;
+pub mod crawling;
+pub mod job;
+pub mod lib_utils;
+pub mod traits;
 #[macro_use]
 mod logging;
-pub mod args;
 
 use crawling::Crawling;
-use crossbeam_channel::{bounded, Receiver, Sender};
-use job::{Job, JobQueue};
+use job::{Job, Queue};
+use lib_utils::CrawlingResult;
 use reqwest::Url;
 use std::error::Error;
-use std::fs::File;
-use std::path::PathBuf;
-use std::thread::{self, JoinHandle};
-use utils::{create_ts_directory, hash};
+use std::hash::Hash;
+use std::sync::Arc;
+use std::thread;
+use traits::{Fetch, Persist};
 
 // TODO: make this configurable from the outside
-static JOB_QUEUE_BUFFER: usize = 1_000_000;
-static CHANNEL_CAPACITY: usize = 5_000;
+static QUEUE_BUFFER: usize = 1_000_000;
 
-pub fn run(url: &str, out_dir: &str, num_threads: usize) -> Result<(), Box<dyn Error>> {
-    let dest = create_ts_directory(out_dir)?;
-    let mut queue = JobQueue::new(JOB_QUEUE_BUFFER);
-    // we halve the number of threads since we're running 2 separate thread-based workers
-    let num_threads = num_threads / 2;
+pub struct Crawler<A, B>
+where
+    A: Persist,
+    B: Fetch,
+{
+    queue: Queue<Job<B>>,
+    num_threads: usize,
+    persister: Arc<A>,
+    fetcher: Arc<B>,
+}
 
-    let (to_enqueue, to_enqueue_recv) = bounded(CHANNEL_CAPACITY);
-    let (to_crawl, to_crawl_recv) = bounded(CHANNEL_CAPACITY);
-    let (to_persist, to_persist_recv) = bounded(CHANNEL_CAPACITY);
-
-    let h1 = crawling_threads(num_threads, to_crawl_recv, to_enqueue.clone(), to_persist);
-    let h2 = persisting_threads(num_threads, to_persist_recv, dest.clone());
-
-    // send initial job over the channel
-    let url = Url::parse(url)?;
-    to_enqueue.send(Job::new(url).unwrap())?;
-
-    for new_job in to_enqueue_recv {
-        queue.enqueue(new_job);
-        for _ in 0..num_threads {
-            if let Some(job) = queue.dequeue() {
-                if to_crawl.send(job).is_err() {
-                    break;
-                }
-            } else {
-                break;
-            }
+impl<A: 'static, B: 'static> Crawler<A, B>
+where
+    A: Persist + Send + Sync,
+    B: Fetch + Eq + Clone + Hash + Send + Sync,
+{
+    pub fn new(persister: A, fetcher: B, num_threads: usize) -> Self {
+        Crawler {
+            queue: Queue::new(QUEUE_BUFFER),
+            persister: Arc::new(persister),
+            fetcher: Arc::new(fetcher),
+            num_threads,
         }
     }
 
-    let _r1 = h1.into_iter().map(|h| h.join());
-    let _r2 = h2.into_iter().map(|h| h.join());
+    pub fn start(&mut self, url: &str) -> Result<(), Box<dyn Error>> {
+        let url = Url::parse(url)?;
+        let initial_job = Job::new(self.fetcher.clone(), url).unwrap();
+        self.queue.enqueue(initial_job);
 
-    Ok(())
-}
-
-fn crawling_threads(
-    num_threads: usize,
-    to_crawl_recv: Receiver<Job>,
-    to_enqueue: Sender<Job>,
-    to_persist: Sender<Crawling>,
-) -> Vec<JoinHandle<()>> {
-    let mut handles = Vec::with_capacity(num_threads);
-    for _ in 0..num_threads {
-        let to_enqueue = to_enqueue.clone();
-        let to_persist = to_persist.clone();
-        let to_crawl_recv = to_crawl_recv.clone();
-        let handle = thread::spawn(move || {
-            for job in to_crawl_recv {
-                if let Ok(crawling) = crawl(&job) {
-                    // find new urls, turn them into `Job`s and send request to enqueue them
-                    crawling.find_urls().and_then(|urls| {
-                        let jobs: Vec<Job> = urls.into_iter().filter_map(Job::new).collect();
-                        for job in jobs {
-                            if to_enqueue.send(job).is_err() {
-                                break;
-                            }
+        loop {
+            let mut handlers = Vec::with_capacity(self.num_threads);
+            for _ in 0..self.num_threads {
+                if let Some(job) = self.queue.dequeue() {
+                    let persister = self.persister.clone();
+                    let fetcher = self.fetcher.clone();
+                    let handler = thread::spawn(move || {
+                        if let Ok(result) = crawl(persister, fetcher, job) {
+                            result.crawling.write().unwrap_or_else(|_| 0);
+                            return result.jobs;
                         }
-                        Some(())
+                        None
                     });
-                    // send request to persist `Crawling`
-                    if to_persist.send(crawling).is_err() {
-                        break;
+                    handlers.push(handler);
+                }
+            }
+
+            for handler in handlers {
+                if let Some(jobs) = handler.join().unwrap() {
+                    for job in jobs {
+                        self.queue.enqueue(job);
                     }
                 }
             }
-        });
-        handles.push(handle);
-    }
-    handles
-}
 
-fn persisting_threads(
-    num_threads: usize,
-    to_persist_recv: Receiver<Crawling>,
-    out_dir: PathBuf,
-) -> Vec<JoinHandle<()>> {
-    let mut handles = Vec::with_capacity(num_threads);
-    for _ in 0..num_threads {
-        let to_persist_recv = to_persist_recv.clone();
-        let out_dir = out_dir.clone();
-        let handle = thread::spawn(move || {
-            for crawling in to_persist_recv {
-                write_to_disk(out_dir.clone(), &crawling);
+            if self.queue.is_empty() {
+                break;
             }
-        });
-        handles.push(handle);
+        }
+
+        Ok(())
     }
-    handles
 }
 
-fn crawl(job: &Job) -> Result<Crawling, Box<dyn Error>> {
-    log!(format!("GET {}", job.get_url()));
-    let (content_type, content) = job.fetch()?;
-    Ok(Crawling::new(job.get_url(), content_type.as_str(), content))
-}
-
-fn write_to_disk(mut dest: PathBuf, crawling: &Crawling) {
-    let file_name = hash(&crawling);
-    let has_domain = crawling.get_domain().is_some();
-    let has_file_extension = crawling.get_file_extension().is_some();
-    if has_domain && has_file_extension {
-        let domain_prefix = crawling.get_domain().unwrap();
-        let file_extension = crawling.get_file_extension().unwrap();
-        dest.push(format!(
-            "{}-{}.{}",
-            domain_prefix, file_name, file_extension
-        ));
-        let mut full_path = File::create(dest).unwrap();
-        crawling.write(&mut full_path).unwrap_or_else(|_| {
-            loge!(format!("Error creating file \"{}\"", file_name));
+fn crawl<A, B>(
+    persister: Arc<A>,
+    fetcher: Arc<B>,
+    job: Job<B>,
+) -> Result<CrawlingResult<A, B>, Box<dyn Error>>
+where
+    A: Persist,
+    B: Fetch,
+{
+    let url = job.get_url();
+    log!(format!("GET {}", &url));
+    if let Ok((content_type, content)) = job.fetch() {
+        let crawling = Crawling::new(persister, job.get_url(), content_type.as_str(), content);
+        if let Some(urls) = crawling.find_urls() {
+            let jobs_arr = Vec::<Job<B>>::with_capacity(urls.len());
+            let jobs = urls.into_iter().fold(jobs_arr, |mut accum, url| {
+                if let Some(job) = Job::new(fetcher.clone(), url) {
+                    accum.push(job);
+                }
+                accum
+            });
+            return Ok(CrawlingResult {
+                crawling,
+                jobs: Some(jobs),
+            });
+        }
+        return Ok(CrawlingResult {
+            crawling,
+            jobs: None,
         });
     }
+    Err(Box::from(format!("Failed to GET {}", &url)))
 }
