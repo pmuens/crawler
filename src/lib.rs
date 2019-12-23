@@ -51,6 +51,14 @@ where
         }
     }
 
+    pub fn get_persister(&self) -> Arc<A> {
+        self.persister.clone()
+    }
+
+    pub fn get_fetcher(&self) -> Arc<B> {
+        self.fetcher.clone()
+    }
+
     pub fn start(&mut self, url: &str) -> Result<(), Box<dyn Error>> {
         let url = Url::parse(url)?;
         let initial_job = Job::new(self.fetcher.clone(), url).unwrap();
