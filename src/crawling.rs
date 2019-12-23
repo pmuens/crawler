@@ -110,32 +110,29 @@ mod tests {
     use crate::traits::Persist;
     use reqwest::Url;
     use std::cell::RefCell;
+    use std::collections::HashMap;
     use std::error::Error;
-    use std::io::Write;
     use std::str::FromStr;
     use std::sync::Arc;
 
-    #[derive(Clone)]
     struct MockPersister {
-        dest: RefCell<Vec<u8>>,
+        dest: RefCell<HashMap<String, String>>,
     }
     impl Default for MockPersister {
         fn default() -> Self {
             MockPersister {
-                dest: RefCell::new(vec![]),
+                dest: RefCell::new(HashMap::<String, String>::new()),
             }
         }
     }
     impl Persist for MockPersister {
         fn persist(&self, content_id: &str, content: &[u8]) -> Result<usize, Box<dyn Error>> {
             let mut dest = self.dest.borrow_mut();
-
-            // combine the `content` with the `content_id` to check whether both parameters
-            // are set correctly
-            let final_content = format!("{} {}", content_id, String::from_utf8_lossy(content));
-
-            dest.write_all(final_content.as_bytes())?;
-            Ok(final_content.len())
+            dest.insert(
+                content_id.to_string(),
+                String::from_utf8_lossy(content).to_string(),
+            );
+            Ok(content_id.len() + content.len())
         }
     }
 
@@ -277,12 +274,15 @@ mod tests {
         let crawling = Crawling::new(persister, url, "text/html", b"Hello World!".to_vec());
         let result = crawling.write();
 
-        let expected_content = b"example.com.html Hello World!";
+        let dest_ref = crawling.persister.dest.borrow();
 
-        assert_eq!(result.unwrap(), 29);
+        assert_eq!(result.unwrap(), 49);
+        assert_eq!(dest_ref.len(), 1);
         assert_eq!(
-            crawling.persister.dest.borrow().to_vec(),
-            expected_content.to_vec()
+            dest_ref
+                .get("example.com-12596474995416492747.html")
+                .unwrap(),
+            "Hello World!"
         );
     }
 
