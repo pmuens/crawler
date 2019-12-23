@@ -1,3 +1,4 @@
+use crate::lib_utils::hash;
 use crate::traits::Persist;
 use regex::Regex;
 use reqwest::Url;
@@ -81,9 +82,11 @@ where
         if has_domain && has_file_extension {
             let domain_prefix = self.get_domain().unwrap();
             let file_extension = self.get_file_extension().unwrap();
-            let formatted_str = format!("{}{}", domain_prefix, file_extension);
+            let content = self.content.as_slice();
+            let hash = hash(&content);
+            let formatted_str = format!("{}-{}{}", domain_prefix, hash, file_extension);
             let content_id = formatted_str.as_str();
-            return self.persister.persist(content_id, self.content.as_slice());
+            return self.persister.persist(content_id, content);
         }
         Err(Box::from("Failed to write Crawling"))
     }

@@ -1,5 +1,5 @@
 use crate::job::BLACKLIST_CONTENT_TYPES;
-use crate::lib_utils::{create_ts_directory, hash};
+use crate::lib_utils::create_ts_directory;
 use crate::traits::{Fetch, Persist};
 use std::error::Error;
 use std::fs::File;
@@ -38,8 +38,7 @@ impl FSPersister {
 impl Persist for FSPersister {
     fn persist(&self, content_id: &str, content: &[u8]) -> Result<usize, Box<dyn Error>> {
         let mut out_dir = self.out_dir.clone();
-        let file_name = hash(&content);
-        out_dir.push(format!("{}-{}", file_name, content_id));
+        out_dir.push(content_id);
         let mut full_path = File::create(out_dir).unwrap();
         full_path.write_all(content)?;
         Ok(content.len())
