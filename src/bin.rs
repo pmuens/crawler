@@ -1,7 +1,6 @@
 use crawler::args::Args;
-use crawler::bin_utils::{FSPersister, Fetcher};
 use crawler::crawler::Crawler;
-use crawler::shared;
+use crawler::shared::{self, FSPersister, MainFetcher};
 use std::env::args;
 
 fn main() {
@@ -16,7 +15,7 @@ fn run_binary() -> shared::Result<()> {
     let args = Args::new(&arguments)?;
 
     let persister = FSPersister::new(args.out_dir)?;
-    let fetcher = Fetcher::new();
+    let fetcher = MainFetcher::new();
 
     let mut crawler = Crawler::new(persister, fetcher, args.num_threads);
     crawler.start(args.url)?;

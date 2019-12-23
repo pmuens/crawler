@@ -1,8 +1,7 @@
 use crate::crawling::Crawling;
 use crate::error::CrawlerError::FetchingError;
 use crate::job::{Job, Queue};
-use crate::lib_utils::CrawlingResult;
-use crate::shared;
+use crate::shared::{self, CrawlingResult};
 use crate::traits::{Fetch, Persist};
 use reqwest::Url;
 use std::hash::Hash;

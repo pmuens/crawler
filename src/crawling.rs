@@ -1,6 +1,5 @@
 use crate::error::CrawlerError::PersistingError;
-use crate::lib_utils::hash;
-use crate::shared;
+use crate::shared::{self, hash};
 use crate::traits::Persist;
 use regex::Regex;
 use reqwest::Url;
