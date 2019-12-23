@@ -15,9 +15,6 @@ impl<'a> Args<'a> {
                 out_dir: args[2].as_str(),
                 num_threads: args[3].parse::<usize>().unwrap(),
             };
-            if !args.num_threads % 2 == 0 {
-                return Err(Box::from("NUM_THREADS must be even"));
-            }
             return Ok(args);
         }
         Err(Box::from("Usage: crawler URL OUT_DIR NUM_THREADS"))
@@ -50,19 +47,5 @@ mod tests {
     fn args_failure_missing_arguments() {
         let args = vec!["file".to_string()];
         assert!(Args::new(&args).unwrap_err().to_string().contains("Usage:"));
-    }
-
-    #[test]
-    fn args_failure_num_threads() {
-        let args = vec![
-            "file".to_string(),
-            "http://example.com".to_string(),
-            "./crawlings".to_string(),
-            "3".to_string(),
-        ];
-        assert!(Args::new(&args)
-            .unwrap_err()
-            .to_string()
-            .contains("must be even"));
     }
 }
