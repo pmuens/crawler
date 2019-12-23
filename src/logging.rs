@@ -8,12 +8,14 @@ pub fn formatted_now() -> String {
     date_time.format("%d/%m/%Y %T").to_string()
 }
 
+#[allow(unused_macros)]
 macro_rules! log {
     ($msg:expr) => {
         println!("INFO - {} - \"{}\"", $crate::logging::formatted_now(), $msg);
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! loge {
     ($msg:expr) => {
         eprintln!(
