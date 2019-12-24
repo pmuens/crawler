@@ -8,7 +8,7 @@ lazy_static! {
 }
 
 pub trait Persist {
-    fn persist(&self, content_id: &str, content: &[u8]) -> shared::Result<usize>;
+    fn persist(&self, id: &str, url: &str, content: &[u8]) -> shared::Result<usize>;
 }
 
 pub trait Fetch {

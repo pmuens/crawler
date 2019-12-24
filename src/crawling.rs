@@ -81,11 +81,12 @@ where
         if has_domain && has_file_extension {
             let domain_prefix = self.get_domain().unwrap();
             let file_extension = self.get_file_extension().unwrap();
+            let url = self.url.as_str();
             let content = self.content.as_slice();
             let hash = hash(&content);
             let formatted_str = format!("{}-{}{}", domain_prefix, hash, file_extension);
-            let content_id = formatted_str.as_str();
-            return self.persister.persist(content_id, content);
+            let id = formatted_str.as_str();
+            return self.persister.persist(id, url, content);
         }
         Err(PersistingError("Failed to write Crawling".to_string()))
     }
@@ -125,13 +126,17 @@ mod tests {
         }
     }
     impl Persist for MockPersister {
-        fn persist(&self, content_id: &str, content: &[u8]) -> shared::Result<usize> {
+        fn persist(&self, id: &str, url: &str, content: &[u8]) -> shared::Result<usize> {
             let mut dest = self.dest.borrow_mut();
             dest.insert(
-                content_id.to_string(),
-                String::from_utf8_lossy(content).to_string(),
+                id.to_string(),
+                format!(
+                    "{} --> {}",
+                    url,
+                    String::from_utf8_lossy(content).to_string()
+                ),
             );
-            Ok(content_id.len() + content.len())
+            Ok(id.len() + content.len())
         }
     }
 
@@ -281,7 +286,7 @@ mod tests {
             dest_ref
                 .get("example.com-12596474995416492747.html")
                 .unwrap(),
-            "Hello World!"
+            "http://example.com/ --> Hello World!"
         );
     }
 

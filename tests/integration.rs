@@ -3,6 +3,7 @@ extern crate crawler;
 use crawler::crawler::Crawler;
 use crawler::shared;
 use crawler::traits::{Fetch, Persist};
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
@@ -43,20 +44,20 @@ impl Fetch for MockFetcher {
 }
 
 struct MockPersister {
-    dest: Mutex<Vec<String>>,
+    dest: Mutex<HashMap<String, String>>,
 }
 impl MockPersister {
     fn new() -> Self {
         MockPersister {
-            dest: Mutex::new(Vec::new()),
+            dest: Mutex::new(HashMap::<String, String>::new()),
         }
     }
 }
 impl Persist for MockPersister {
-    fn persist(&self, content_id: &str, _content: &[u8]) -> shared::Result<usize> {
+    fn persist(&self, id: &str, url: &str, _content: &[u8]) -> shared::Result<usize> {
         let mut dest = self.dest.lock().unwrap();
-        dest.push(content_id.to_string());
-        Ok(content_id.len())
+        dest.insert(url.to_string(), id.to_string());
+        Ok(url.len() + id.len())
     }
 }
 
@@ -72,15 +73,34 @@ fn integration() {
     let _result = crawler.start(url);
 
     let persister_ref = crawler.get_persister();
-    let persister_content = persister_ref.dest.lock().unwrap();
-    let mut expected_content = persister_content.to_vec();
-    expected_content.sort();
+    let persister_hashmap = persister_ref.dest.lock().unwrap();
+
+    let mut keys: Vec<String> = Vec::with_capacity(persister_hashmap.len());
+    let mut values: Vec<String> = Vec::with_capacity(persister_hashmap.len());
+    for (key, value) in persister_hashmap.iter() {
+        keys.push(key.to_string());
+        values.push(value.to_string());
+    }
+
+    keys.sort();
+    values.sort();
 
     // the content our `MockFetcher` returns has 5 urls. Including the starting URL we have a total
     // of 6 URLs the crawler should crawl
-    assert_eq!(persister_content.len(), 6);
+    assert_eq!(persister_hashmap.len(), 6);
     assert_eq!(
-        expected_content,
+        keys,
+        vec![
+            "http://example.com/",
+            "http://jane.doe.com/about",
+            "http://john.doe.com/about",
+            "https://example.com/about",
+            "https://example.com/imprint",
+            "https://www.doe.com/"
+        ]
+    );
+    assert_eq!(
+        values,
         vec![
             "example.com-5364512737893576011.html",
             "example.com-5364512737893576011.html",
@@ -89,5 +109,5 @@ fn integration() {
             "john.doe.com-5364512737893576011.html",
             "www.doe.com-5364512737893576011.html"
         ]
-    );
+    )
 }

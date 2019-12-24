@@ -42,9 +42,9 @@ impl FSPersister {
     }
 }
 impl Persist for FSPersister {
-    fn persist(&self, content_id: &str, content: &[u8]) -> self::Result<usize> {
+    fn persist(&self, id: &str, _url: &str, content: &[u8]) -> self::Result<usize> {
         let mut out_dir = self.out_dir.clone();
-        out_dir.push(content_id);
+        out_dir.push(id);
         let mut full_path = File::create(out_dir).unwrap();
         full_path.write_all(content)?;
         Ok(content.len())
